@@ -1,0 +1,13 @@
+### 강의 등록 (201 Created, 초기 상태 DRAFT)
+POST http://localhost:8080/courses
+X-User-Id: 1
+Content-Type: application/json
+
+{
+  "title": "스프링 부트 완전 정복",
+  "description": "JPA부터 배포까지",
+  "price": 99000,
+  "capacity": 30,
+  "startDate": "2026-07-01",
+  "endDate": "2026-08-31"
+}

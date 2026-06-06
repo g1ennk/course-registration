@@ -210,7 +210,17 @@ X-User-Id: 1
 | `capacity`              | 필수, `1` 이상                           |
 | `startDate` / `endDate` | 필수, `startDate ≤ endDate` (과거 날짜 허용) |
 
-> 검증 실패 응답도 공통 에러 바디 `{ "code": "VALIDATION_FAILED", "message": ... }`를 그대로 사용한다(필드별 `errors[]` 미제공).
+> 단일 필드 검증 실패 응답은 공통 에러 바디의 `errors[]`에 필드별 상세를 담아 반환한다. 단, 필드 간 교차검증(`startDate ≤ endDate`) 위반은 `INVALID_REQUEST` 코드와 빈 `errors[]`로 반환한다.
+>
+> ```json
+> {
+>   "code": "VALIDATION_FAILED",
+>   "message": "입력값 검증에 실패했습니다",
+>   "errors": [
+>     { "field": "title", "message": "제목은 필수입니다" }
+>   ]
+> }
+> ```
 
 **Response** `201 Created`
 
@@ -461,6 +471,7 @@ X-User-Id: 100
 - 기본 포트: `8080`
 - DB: 인메모리 H2 (애플리케이션 기동 시 스키마 자동 생성, 종료 시 소멸)
 - H2 콘솔: `http://localhost:8080/h2-console` (JDBC URL `jdbc:h2:mem:testdb`, user `sa`, password 없음)
+- API 샘플 요청: `http/` 디렉터리의 `.http` 파일 — IntelliJ HTTP Client로 바로 실행 가능 (구현된 기능의 정상 요청 샘플, 실패 케이스는 테스트 코드가 담당)
 
 ### 테스트 실행 방법
 
@@ -472,7 +483,7 @@ X-User-Id: 100
 
 | 테스트              | 위치                                 | 검증 내용                                                                      |
 |------------------|------------------------------------|----------------------------------------------------------------------------|
-| `CourseTest`     | `course/domain/CourseTest`         | 강의 상태 전이(`DRAFT`→`OPEN`→`CLOSED`) 도메인 규칙과 불법 전이 예외, 소유자 판별                 |
+| `CourseTest`     | `course/domain/CourseTest`         | 강의 상태 전이(`DRAFT`→`OPEN`→`CLOSED`) 도메인 규칙과 불법 전이 예외, 소유자 판별, 기간 불변식(시작일 ≤ 종료일) |
 | `EnrollmentTest` | `enrollment/domain/EnrollmentTest` | 신청 상태 전이(`PENDING`→`CONFIRMED`/`CANCELLED`) 규칙과 불법 전이 예외, 소유자 판별, 활성 여부 판별 |
 
 ## 9. AI 활용 범위
