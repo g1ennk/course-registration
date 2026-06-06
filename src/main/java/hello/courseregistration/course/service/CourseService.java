@@ -1,12 +1,18 @@
 package hello.courseregistration.course.service;
 
+import hello.courseregistration.common.exception.ApiException;
+import hello.courseregistration.common.exception.ErrorCode;
 import hello.courseregistration.course.domain.Course;
+import hello.courseregistration.course.domain.CourseStatus;
 import hello.courseregistration.course.dto.request.CourseCreateRequest;
 import hello.courseregistration.course.dto.response.CourseResponse;
+import hello.courseregistration.course.dto.response.CourseSummaryResponse;
 import hello.courseregistration.course.repository.CourseRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -22,5 +28,18 @@ public class CourseService {
                 request.startDate(), request.endDate()
         );
         return CourseResponse.from(courseRepository.save(course));
+    }
+
+    @Transactional(readOnly = true)
+    public List<CourseSummaryResponse> getList(CourseStatus status) {
+        if (status == CourseStatus.DRAFT) {
+            throw new ApiException(ErrorCode.INVALID_REQUEST, "DRAFT는 목록 조회에서 허용되지 않습니다");
+        }
+        List<Course> courses = (status == null)
+                ? courseRepository.findByStatusNotOrderByCreatedAtDesc(CourseStatus.DRAFT)
+                : courseRepository.findByStatusOrderByCreatedAtDesc(status);
+        return courses.stream()
+                .map(CourseSummaryResponse::from)
+                .toList();
     }
 }

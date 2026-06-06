@@ -11,3 +11,9 @@ Content-Type: application/json
   "startDate": "2026-07-01",
   "endDate": "2026-08-31"
 }
+
+### 강의 목록 - 공개 전체 (DRAFT 제외, 최신순)
+GET http://localhost:8080/courses
+
+### 강의 목록 - 상태 필터 (OPEN)
+GET http://localhost:8080/courses?status=OPEN
