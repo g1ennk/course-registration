@@ -38,6 +38,17 @@ class CourseTest {
     }
 
     @Test
+    void CLOSED를_open하면_예외() {
+        Course c = draftCourse();
+        c.open();
+        c.close(); // DRAFT → OPEN → CLOSED
+        assertThatThrownBy(c::open)
+                .isInstanceOf(ApiException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INVALID_STATE_TRANSITION);
+    }
+
+    @Test
     void close는_OPEN에서만() {
         Course c = draftCourse();
         c.open();
@@ -48,6 +59,17 @@ class CourseTest {
     @Test
     void DRAFT를_close하면_예외() {
         Course c = draftCourse();   // DRAFT 상태 (open 안 함)
+        assertThatThrownBy(c::close)
+                .isInstanceOf(ApiException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INVALID_STATE_TRANSITION);
+    }
+
+    @Test
+    void CLOSED를_close하면_예외() {
+        Course c = draftCourse();
+        c.open();
+        c.close(); // DRAFT → OPEN → CLOSED
         assertThatThrownBy(c::close)
                 .isInstanceOf(ApiException.class)
                 .extracting("errorCode")

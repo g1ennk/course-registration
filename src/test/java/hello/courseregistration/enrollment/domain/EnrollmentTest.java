@@ -37,6 +37,16 @@ class EnrollmentTest {
     }
 
     @Test
+    void CANCELLED를_confirm하면_예외() {
+        Enrollment e = pendingEnrollment();
+        e.cancel();                        // PENDING → CANCELLED
+        assertThatThrownBy(e::confirm)
+                .isInstanceOf(ApiException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INVALID_STATE_TRANSITION);
+    }
+
+    @Test
     void cancel은_PENDING에서_CANCELLED로() {
         Enrollment e = pendingEnrollment(); // 초기 PENDING
         e.cancel();
