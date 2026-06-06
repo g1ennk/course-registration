@@ -1,12 +1,26 @@
 package hello.courseregistration.course.domain;
 
 import hello.courseregistration.course.common.exception.IllegalStateTransitionException;
+import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Objects;
 
+@Entity
+@Table(name = "course")
 @Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Course {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
     private Long creatorId;
     private String title;
@@ -15,7 +29,15 @@ public class Course {
     private int capacity;
     private LocalDate startDate;
     private LocalDate endDate;
+
+    @Enumerated(EnumType.STRING)
     private CourseStatus status;
+
+    @CreationTimestamp
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    private LocalDateTime updatedAt;
 
     public Course(Long creatorId, String title, String description, int price, int capacity, LocalDate startDate, LocalDate endDate) {
         this.creatorId = creatorId;
@@ -43,6 +65,6 @@ public class Course {
     }
 
     public boolean isOwnedBy(Long userId) {
-        return creatorId.equals(userId);
+        return Objects.equals(creatorId, userId);
     }
 }

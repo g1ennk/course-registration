@@ -46,7 +46,7 @@
 
 ## 3. 기술 스택
 
-- 언어 : Java 21
+- 언어: Java 21
 - 프레임워크: Spring Boot 4.0.6
 - ORM: Spring Data JPA
 - DB: H2
@@ -56,7 +56,7 @@
 ### 도메인 규칙
 
 1. 인증/인가: `X-User-Id` 헤더(Long)으로 간단히 식별
-2. 정원 점유(활성 상태): 신청을 완료했지만 결제는 아직 안한 `PENDING`과 신청 후 결제까지 완료한 `CONFIRMED`이 자리를 차지한다.
+2. 정원 점유(활성 상태): 신청을 완료했지만 결제는 아직 안 한 `PENDING`과 신청 후 결제까지 완료한 `CONFIRMED`가 자리를 차지한다.
     - `ACTIVE` = `PENDING` + `CONFIRMED`
     - `INACTIVE` = `CANCELLED`
 3. 취소 규칙: 활성 상태 시 즉시 취소 가능하고, 취소 시 즉시 점유 해제 (기간 제한은 선택 구현이므로 추후 구현 가능)
@@ -120,22 +120,13 @@
 
 ### 구현 시퀀스
 
-수강 신청(`POST /courses/{courseId}/enrollments`)은 **단일 쓰기 트랜잭션(`@Transactional`)**으로 처리하며, 다음 순서를 따른다.
+수강 신청(`POST /courses/{courseId}/enrollments`)은 단일 쓰기 트랜잭션(`@Transactional`)으로 처리하며, 다음 순서를 따른다.
 
-1. `courseId`로 **Course 행을 비관적 쓰기 락**으로 조회 (`SELECT ... FOR UPDATE`, JPA `@Lock(PESSIMISTIC_WRITE)`)
+1. `courseId`로 Course 행을 비관적 쓰기 락으로 조회 (`SELECT ... FOR UPDATE`, JPA `@Lock(PESSIMISTIC_WRITE)`)
 2. 강의가 `OPEN` 상태인지 확인 — 아니면 `400`
 3. 같은 `classmate_id`의 활성 신청(`PENDING`/`CONFIRMED`) 존재 여부 확인 — 있으면 `409`(중복)
 4. 활성 신청 수를 COUNT하여 `capacity`와 비교 — 초과면 `409`(만석)
 5. `PENDING` 신청 INSERT 후 커밋
-
-> 중복·정원 검사는 **모두 1번 락 획득 이후** 수행하여 동시 신청 레이스를 차단한다. 잠금 대상은 잔여석 카운트의 기준이 되는 **Course 행**이며, 별도 잔여석 컬럼 없이 Enrollment
-> COUNT로 점유를 산정한다. 보조 수단으로 `(course_id, classmate_id)` 활성 부분 유니크 인덱스를 둘 수 있으나, H2는 부분 유니크 인덱스를 표준 지원하지 않으므로 핵심 보장은 락 구간
-> 내
-> 검사에 둔다.
-
-결제 확정(`confirm`)·취소(`cancel`)는 대상 Enrollment 단건의 상태만 변경하는 단일 `@Transactional`이며, **강의 상태(`CLOSED` 포함)와 무관하게 신청 상태만 검사**
-한다(이미 `PENDING`인 신청은 강의가 `CLOSED`여도 확정·취소 가능). 정원은 별도 컬럼 없이 신청 트랜잭션의 Course 행 락 구간에서 활성 COUNT로 매번 재계산되므로, 취소로 인한 점유 해제도
-다음 신청 시점에 자동 반영되어 일관성이 유지된다.
 
 ## 6. 데이터 모델
 
@@ -179,7 +170,7 @@ erDiagram
 | 2 | PATCH  | `/courses/{courseId}/status`          | 상태 전이                             | 크리에이터(소유자)  | X-User-Id     | 200 | 400(불법전이)·403·404          |
 | 3 | GET    | `/courses?status={status}`            | 목록(상태 필터)                         | 누구나         | X-User-Id(선택) | 200 | 400(잘못된 status)            |
 | 4 | GET    | `/courses/{courseId}`                 | 상세(현재 신청 인원 포함)                   | 누구나         | —             | 200 | 404                        |
-| 5 | POST   | `/courses/{courseId}/enrollments`     | **수강 신청** ★동시성                    | 클래스메이트      | X-User-Id     | 201 | 409(만석/중복)·400(미OPEN)·404  |
+| 5 | POST   | `/courses/{courseId}/enrollments`     | 수강 신청 ★동시성                        | 클래스메이트      | X-User-Id     | 201 | 409(만석/중복)·400(미OPEN)·404  |
 | 6 | PATCH  | `/enrollments/{enrollmentId}/confirm` | 결제 확정 PENDING→CONFIRMED           | 클래스메이트(소유자) | X-User-Id     | 200 | 400(PENDING 아닌 경우)·403·404 |
 | 7 | PATCH  | `/enrollments/{enrollmentId}/cancel`  | 취소(PENDING/CONFIRMED → CANCELLED) | 클래스메이트(소유자) | X-User-Id     | 200 | 400(이미 취소)·403·404         |
 | 8 | GET    | `/enrollments/me`                     | 내 신청 목록(CANCELLED 포함 최신순)         | 클래스메이트      | X-User-Id     | 200 | —                          |
@@ -244,9 +235,9 @@ X-User-Id: 1
 
 강의 목록 조회.
 
-- `status` 쿼리 파라미터로 필터링 가능하며, **생략 시 전체 반환**한다. 허용값은 `DRAFT`·`OPEN`·`CLOSED`이며 그 외 값은 `400`.
+- `status` 쿼리 파라미터로 필터링 가능하며, 생략 시 전체 반환한다. 허용값은 `DRAFT`·`OPEN`·`CLOSED`이며 그 외 값은 `400`.
 - 기본 정렬은 `createdAt` 내림차순(최신순).
-- `DRAFT` 강의는 기본적으로 제외한다. `X-User-Id` 헤더가 있으면 **본인 소유 `DRAFT`만 추가로 포함**하고, 없으면 전부 제외한다.
+- `DRAFT` 강의는 기본적으로 제외한다. `X-User-Id` 헤더가 있으면 본인 소유 `DRAFT`만 추가로 포함하고, 없으면 전부 제외한다.
 - 응답은 요약 DTO(`id`·`title`·`price`·`capacity`·`status`·`createdAt`)다.
 
 **Request**
@@ -477,6 +468,26 @@ X-User-Id: 100
 ./gradlew test
 ```
 
-> 동시성 테스트는 `CountDownLatch`/`ExecutorService`로 마지막 1자리에 N명 동시 신청을 재현해, 정확히 1건만 `201`이고 나머지는 `409`인지 검증한다. (테스트 코드 추가 시 위치·클래스명 갱신 예정)
+**현재 테스트 구성**
+
+| 테스트          | 위치                  | 검증 내용                                                      |
+|--------------|---------------------|------------------------------------------------------------|
+| `CourseTest` | `course/CourseTest` | 강의 상태 전이(`DRAFT`→`OPEN`→`CLOSED`) 도메인 규칙과 불법 전이 예외, 소유자 판별 |
 
 ## 9. AI 활용 범위
+
+**사용 도구:** Claude Code
+
+1. 설계 및 명세 정리
+    - 도메인 규칙, 에러 규약, API 명세를 AI와 함께 설계하며 트레이드오프를 검토하고, 최종 결정은 직접 내렸습니다.
+2. TDD 구현
+    - 상태 전이·정원 관리·동시성 제어 같은 주요 로직은 빨강 → 초록 사이클(TDD)로 코드를 직접 작성했고, AI는 단계 안내만 담당했습니다.
+3. 커밋 전 점검
+    - 커밋 전 4단계를 순서대로 거쳤습니다. "올바른 걸 만들었나 → 올바르게 만들었나 → 깔끔하게 만들었나". 1·2는 편향을 줄이려 독립 에이전트로 점검(보고)하고, 수정은 AI가 적용한 뒤 직접
+      검토했습니다.
+        1. 스펙 대조: 구현이 README 스펙과 일치하는지 대조하여 방향 오류를 가장 먼저 차단.
+        2. 코드 리뷰(`/code-review`): 버그, 엣지케이스, 정확성 점검.
+        3. 단순화(`/simplify`): 중복, 복잡도 정리.
+        4. 전체 테스트: 위 수정 및 정리를 반영한 뒤 `./gradlew test`가 전부 green인지 확인하고, 실패 시 커밋을 보류.
+4. 커밋 메시지
+    - 변경 내용을 바탕으로 AI가 초안을 제시하면, 직접 검토 후 수정해 커밋했습니다.
