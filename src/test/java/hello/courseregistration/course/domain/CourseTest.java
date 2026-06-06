@@ -55,6 +55,22 @@ class CourseTest {
     }
 
     @Test
+    void 시작일이_종료일보다_늦으면_생성_불가() {
+        assertThatThrownBy(() -> new Course(1L, "Spring", "desc", 50000, 2,
+                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 7, 1)))
+                .isInstanceOf(ApiException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INVALID_REQUEST);
+    }
+
+    @Test
+    void 시작일과_종료일이_같으면_생성_가능() {
+        LocalDate sameDay = LocalDate.of(2026, 7, 1);
+        assertThat(new Course(1L, "Spring", "desc", 50000, 2, sameDay, sameDay).getStatus())
+                .isEqualTo(CourseStatus.DRAFT);
+    }
+
+    @Test
     void 소유자_판별() {
         Course c = draftCourse();          // creatorId = 1L
         assertThat(c.isOwnedBy(1L)).isTrue();

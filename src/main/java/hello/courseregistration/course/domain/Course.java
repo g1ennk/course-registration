@@ -41,6 +41,9 @@ public class Course {
     private LocalDateTime updatedAt;
 
     public Course(Long creatorId, String title, String description, int price, int capacity, LocalDate startDate, LocalDate endDate) {
+        if (startDate.isAfter(endDate)) {
+            throw new ApiException(ErrorCode.INVALID_REQUEST, "시작일은 종료일보다 늦을 수 없습니다");
+        }
         this.creatorId = creatorId;
         this.title = title;
         this.description = description;
