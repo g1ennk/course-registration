@@ -70,7 +70,7 @@
 7. 수강 신청 검증 순서: courseId 존재 여부(404) → 강의 `OPEN` 여부(400) → 중복 신청(409) → 정원 초과(409)
 8. 역할 검증 없음: 별도 User 엔티티가 없어 크리에이터/클래스메이트 역할을 강제하지 않는다. 동일 사용자가 강의를 만들면서 다른 강의에 신청할 수 있고, 본인 강의에 본인이 신청하는 것도 허용한다(
    소유자 검사는 상태 전이·confirm·cancel에만 적용).
-9. 강의 목록 조회 시 `DRAFT`는 기본 제외하며, `X-User-Id` 헤더가 있으면 본인 소유 `DRAFT`만 추가로 포함한다.
+9. 강의 목록 조회는 공개 목록으로, `DRAFT`(초안)는 노출하지 않으며 `status` 필터값으로도 허용하지 않는다(요청 시 `400`). 초안 확인은 상세 조회(id 직접 접근)로 대신한다. 따라서 목록 엔드포인트는 `X-User-Id` 헤더를 사용하지 않는다.
 
 ### 에러 규약
 
@@ -167,7 +167,7 @@ erDiagram
 |---|--------|---------------------------------------|-----------------------------------|-------------|---------------|-----|----------------------------|
 | 1 | POST   | `/courses`                            | 강의 등록(DRAFT)                      | 크리에이터       | X-User-Id     | 201 | 400(검증)                    |
 | 2 | PATCH  | `/courses/{courseId}/status`          | 상태 전이                             | 크리에이터(소유자)  | X-User-Id     | 200 | 400(불법전이)·403·404          |
-| 3 | GET    | `/courses?status={status}`            | 목록(상태 필터)                         | 누구나         | X-User-Id(선택) | 200 | 400(잘못된 status)            |
+| 3 | GET    | `/courses?status={status}`            | 목록(상태 필터: OPEN·CLOSED)            | 누구나         | —             | 200 | 400(DRAFT·잘못된 status)      |
 | 4 | GET    | `/courses/{courseId}`                 | 상세(현재 신청 인원 포함)                   | 누구나         | —             | 200 | 404                        |
 | 5 | POST   | `/courses/{courseId}/enrollments`     | 수강 신청 ★동시성                        | 클래스메이트      | X-User-Id     | 201 | 409(만석/중복)·400(미OPEN)·404  |
 | 6 | PATCH  | `/enrollments/{enrollmentId}/confirm` | 결제 확정 PENDING→CONFIRMED           | 클래스메이트(소유자) | X-User-Id     | 200 | 400(PENDING 아닌 경우)·403·404 |
@@ -234,9 +234,9 @@ X-User-Id: 1
 
 강의 목록 조회.
 
-- `status` 쿼리 파라미터로 필터링 가능하며, 생략 시 전체 반환한다. 허용값은 `DRAFT`·`OPEN`·`CLOSED`이며 그 외 값은 `400`.
+- `status` 쿼리 파라미터로 필터링 가능하며, 생략 시 `DRAFT`를 제외한 전체(`OPEN`·`CLOSED`)를 반환한다. 허용값은 `OPEN`·`CLOSED`이며, `DRAFT` 및 그 외 값은 `400`.
 - 기본 정렬은 `createdAt` 내림차순(최신순).
-- `DRAFT` 강의는 기본적으로 제외한다. `X-User-Id` 헤더가 있으면 본인 소유 `DRAFT`만 추가로 포함하고, 없으면 전부 제외한다.
+- `DRAFT`(초안)는 공개 목록에 노출하지 않으며, `status=DRAFT` 요청도 `400`으로 거부한다. (초안은 상세 조회로만 접근)
 - 응답은 요약 DTO(`id`·`title`·`price`·`capacity`·`status`·`createdAt`)다.
 
 **Request**
