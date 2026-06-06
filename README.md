@@ -81,12 +81,13 @@
 | 404 Not Found   | 존재하지 않는 courseId<br>존재하지 않는 enrollmentId                                                                              |
 | 409 Conflict    | 정원 초과: 활성 신청 수 (`PENDING` + `CONFIRMED` >= capacity)<br>중복 신청: 같은 강의에 이미 `PENDING` 또는 `CONFIRMED` 신청 존재               |
 
-**공통 에러 응답 바디** — 모든 4xx 응답은 아래 형식을 따른다.
+**공통 에러 응답 바디** — 비즈니스·검증 에러로 인한 4xx 응답은 아래 형식을 따른다. `errors[]`는 입력값 검증 실패 시 필드별 상세(`field`·`message`)를 담고, 그 외 에러에서는 빈 배열이다.
 
 ```json
 {
   "code": "COURSE_FULL",
-  "message": "정원이 초과되었습니다"
+  "message": "정원이 초과되었습니다",
+  "errors": []
 }
 ```
 
