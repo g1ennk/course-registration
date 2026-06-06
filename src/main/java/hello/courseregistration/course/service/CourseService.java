@@ -8,6 +8,7 @@ import hello.courseregistration.course.dto.request.CourseCreateRequest;
 import hello.courseregistration.course.dto.response.CourseDetailResponse;
 import hello.courseregistration.course.dto.response.CourseResponse;
 import hello.courseregistration.course.dto.response.CourseSummaryResponse;
+import hello.courseregistration.course.dto.response.StatusResponse;
 import hello.courseregistration.course.repository.CourseRepository;
 import hello.courseregistration.enrollment.domain.EnrollmentStatus;
 import hello.courseregistration.enrollment.repository.EnrollmentRepository;
@@ -57,5 +58,16 @@ public class CourseService {
         int remaining = course.getCapacity() - enrolledCount;
 
         return CourseDetailResponse.from(course, enrolledCount, remaining);
+    }
+
+    @Transactional
+    public StatusResponse changeStatus(Long courseId, Long userId, CourseStatus target) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ApiException(ErrorCode.COURSE_NOT_FOUND));   // 404
+        if (!course.isOwnedBy(userId)) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "강의 소유자만 상태를 변경할 수 있습니다");  // 403
+        }
+        course.changeStatusTo(target);   // 전이 불법/DRAFT → 400
+        return StatusResponse.from(course);
     }
 }

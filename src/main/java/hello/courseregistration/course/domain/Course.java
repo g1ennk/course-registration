@@ -83,6 +83,16 @@ public class Course {
         this.status = CourseStatus.CLOSED;
     }
 
+    public void changeStatusTo(CourseStatus target) {
+        switch (target) {
+            // 전이 허용 — 단방향 가드는 open()/close()가 검증
+            case OPEN -> open();
+            case CLOSED -> close();
+            // 전이 불가 — DRAFT는 초기 상태일 뿐 전이 목표가 될 수 없음
+            case DRAFT -> throw new ApiException(ErrorCode.INVALID_STATE_TRANSITION, "DRAFT로는 변경할 수 없습니다");
+        }
+    }
+
     public boolean isOwnedBy(Long userId) {
         return Objects.equals(creatorId, userId);
     }

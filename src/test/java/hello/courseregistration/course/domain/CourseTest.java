@@ -15,6 +15,8 @@ class CourseTest {
                 LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31));
     }
 
+    // ===== 상태 전이: open / close =====
+
     @Test
     void 새_강의는_DRAFT() {
         assertThat(draftCourse().getStatus()).isEqualTo(CourseStatus.DRAFT);
@@ -76,6 +78,35 @@ class CourseTest {
                 .isEqualTo(ErrorCode.INVALID_STATE_TRANSITION);
     }
 
+    // ===== 상태 전이: changeStatusTo (target 디스패치) =====
+
+    @Test
+    void changeStatusTo_OPEN이면_OPEN으로() {
+        Course c = draftCourse();
+        c.changeStatusTo(CourseStatus.OPEN);
+        assertThat(c.getStatus()).isEqualTo(CourseStatus.OPEN);
+    }
+
+    @Test
+    void changeStatusTo_CLOSED면_CLOSED로() {
+        Course c = draftCourse();
+        c.open(); // DRAFT → OPEN
+        c.changeStatusTo(CourseStatus.CLOSED);
+        assertThat(c.getStatus()).isEqualTo(CourseStatus.CLOSED);
+    }
+
+    @Test
+    void changeStatusTo_DRAFT면_예외() {
+        Course c = draftCourse();
+        c.open(); // OPEN
+        assertThatThrownBy(() -> c.changeStatusTo(CourseStatus.DRAFT))
+                .isInstanceOf(ApiException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INVALID_STATE_TRANSITION);
+    }
+
+    // ===== 기간 불변식 (생성자) =====
+
     @Test
     void 시작일이_종료일보다_늦으면_생성_불가() {
         assertThatThrownBy(() -> new Course(1L, "Spring", "desc", 50000, 2,
@@ -91,6 +122,8 @@ class CourseTest {
         assertThat(new Course(1L, "Spring", "desc", 50000, 2, sameDay, sameDay).getStatus())
                 .isEqualTo(CourseStatus.DRAFT);
     }
+
+    // ===== 소유권 =====
 
     @Test
     void 소유자_판별() {

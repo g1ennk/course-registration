@@ -20,3 +20,12 @@ GET http://localhost:8080/courses?status=OPEN
 
 ### 강의 상세 조회 (200 OK — enrolledCount·remaining 포함)
 GET http://localhost:8080/courses/1
+
+### 강의 상태 변경 (200 OK, DRAFT → OPEN, 크리에이터만)
+PATCH http://localhost:8080/courses/1/status
+X-User-Id: 1
+Content-Type: application/json
+
+{
+  "status": "OPEN"
+}

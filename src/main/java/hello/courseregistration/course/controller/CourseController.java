@@ -2,9 +2,11 @@ package hello.courseregistration.course.controller;
 
 import hello.courseregistration.course.domain.CourseStatus;
 import hello.courseregistration.course.dto.request.CourseCreateRequest;
+import hello.courseregistration.course.dto.request.CourseStatusUpdateRequest;
 import hello.courseregistration.course.dto.response.CourseDetailResponse;
 import hello.courseregistration.course.dto.response.CourseResponse;
 import hello.courseregistration.course.dto.response.CourseSummaryResponse;
+import hello.courseregistration.course.dto.response.StatusResponse;
 import hello.courseregistration.course.service.CourseService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -37,5 +39,13 @@ public class CourseController {
     @GetMapping("/{courseId}")
     public CourseDetailResponse getDetail(@PathVariable Long courseId) {
         return courseService.getDetail(courseId);
+    }
+
+    @PatchMapping("/{courseId}/status")
+    public StatusResponse changeStatus(
+            @RequestHeader("X-User-Id") Long userId,
+            @PathVariable Long courseId,
+            @Valid @RequestBody CourseStatusUpdateRequest request) {
+        return courseService.changeStatus(courseId, userId, request.status());
     }
 }

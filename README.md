@@ -495,10 +495,13 @@ X-User-Id: 100
 
 **현재 테스트 구성**
 
-| 테스트              | 위치                                 | 검증 내용                                                                         |
-|------------------|------------------------------------|-------------------------------------------------------------------------------|
-| `CourseTest`     | `course/domain/CourseTest`         | 강의 상태 전이(`DRAFT`→`OPEN`→`CLOSED`) 도메인 규칙과 불법 전이 예외, 소유자 판별, 기간 불변식(시작일 ≤ 종료일) |
-| `EnrollmentTest` | `enrollment/domain/EnrollmentTest` | 신청 상태 전이(`PENDING`→`CONFIRMED`/`CANCELLED`) 규칙과 불법 전이 예외, 소유자 판별, 활성 여부 판별    |
+| 테스트 | 위치 | 유형 | 검증 내용 |
+|---|---|---|---|
+| `CourseTest` | `course/domain` | 단위 | 상태 전이(`DRAFT`→`OPEN`→`CLOSED`)·불법 전이 예외, `changeStatusTo` 디스패치, 소유자 판별, 기간 불변식(시작일 ≤ 종료일) |
+| `EnrollmentTest` | `enrollment/domain` | 단위 | 신청 상태 전이(`PENDING`→`CONFIRMED`/`CANCELLED`)·불법 전이 예외, 소유자 판별, 활성 여부 판별 |
+| `CourseRepositoryTest` | `course/repository` | `@DataJpaTest` | 공개 목록 조회 시 `DRAFT` 제외 |
+| `EnrollmentRepositoryTest` | `enrollment/repository` | `@DataJpaTest` | 활성 신청(`PENDING`+`CONFIRMED`) 집계 — 취소·타 강의 제외 |
+| `CourseStatusApiTest` | `course/controller` | `@SpringBootTest` | 상태 변경 API 통합 — 검증 순서(404→403→400)·정상 전이 |
 
 ## 9. 미구현 / 제약사항
 
@@ -513,6 +516,7 @@ X-User-Id: 100
     - 도메인 규칙, 에러 규약, API 명세를 AI와 함께 설계하며 트레이드오프를 검토하고, 최종 결정은 직접 내렸습니다.
 2. TDD 구현
     - 상태 전이, 정원 관리, 동시성 제어 같은 주요 로직은 빨강 → 초록 사이클(TDD)로 코드를 직접 작성했고, AI는 가이드로 활용했습니다.
+    - 나머지 기타 테스트들은 스펙을 기반으로 AI로 구현 후 검증을 하였습니다.
 3. 커밋 전 점검
     - 커밋 전 4단계를 순서대로 거쳤습니다. "올바른 걸 만들었나 → 올바르게 만들었나 → 깔끔하게 만들었나". 1·2는 편향을 줄이려 독립 에이전트로 점검(보고)하고, 수정은 AI가 적용한 뒤 직접
       검토했습니다.
