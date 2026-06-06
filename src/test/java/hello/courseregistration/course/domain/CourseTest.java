@@ -1,8 +1,6 @@
-package hello.courseregistration.course;
+package hello.courseregistration.course.domain;
 
 import hello.courseregistration.common.exception.IllegalStateTransitionException;
-import hello.courseregistration.course.domain.Course;
-import hello.courseregistration.course.domain.CourseStatus;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
