@@ -22,16 +22,22 @@ public class Enrollment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false)
     private Long courseId;
+
+    @Column(nullable = false)
     private Long classmateId;
 
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private EnrollmentStatus status;
 
     @CreationTimestamp
+    @Column(nullable = false)
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
+    @Column(nullable = false)
     private LocalDateTime updatedAt;
 
     public Enrollment(Long courseId, Long classmateId) {
