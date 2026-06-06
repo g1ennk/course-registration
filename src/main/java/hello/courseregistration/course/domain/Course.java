@@ -1,6 +1,6 @@
 package hello.courseregistration.course.domain;
 
-import hello.courseregistration.course.common.exception.IllegalStateTransitionException;
+import hello.courseregistration.common.exception.IllegalStateTransitionException;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;

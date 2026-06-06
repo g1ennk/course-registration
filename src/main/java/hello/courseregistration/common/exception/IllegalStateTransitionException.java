@@ -1,4 +1,4 @@
-package hello.courseregistration.course.common.exception;
+package hello.courseregistration.common.exception;
 
 import org.springframework.http.HttpStatus;
 

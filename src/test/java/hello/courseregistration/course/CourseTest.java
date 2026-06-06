@@ -1,6 +1,6 @@
 package hello.courseregistration.course;
 
-import hello.courseregistration.course.common.exception.IllegalStateTransitionException;
+import hello.courseregistration.common.exception.IllegalStateTransitionException;
 import hello.courseregistration.course.domain.Course;
 import hello.courseregistration.course.domain.CourseStatus;
 import org.junit.jupiter.api.Test;
