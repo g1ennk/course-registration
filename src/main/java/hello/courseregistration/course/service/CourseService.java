@@ -5,9 +5,12 @@ import hello.courseregistration.common.exception.ErrorCode;
 import hello.courseregistration.course.domain.Course;
 import hello.courseregistration.course.domain.CourseStatus;
 import hello.courseregistration.course.dto.request.CourseCreateRequest;
+import hello.courseregistration.course.dto.response.CourseDetailResponse;
 import hello.courseregistration.course.dto.response.CourseResponse;
 import hello.courseregistration.course.dto.response.CourseSummaryResponse;
 import hello.courseregistration.course.repository.CourseRepository;
+import hello.courseregistration.enrollment.domain.EnrollmentStatus;
+import hello.courseregistration.enrollment.repository.EnrollmentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +22,7 @@ import java.util.List;
 public class CourseService {
 
     private final CourseRepository courseRepository;
+    private final EnrollmentRepository enrollmentRepository;
 
     @Transactional
     public CourseResponse create(Long creatorId, CourseCreateRequest request) {
@@ -41,5 +45,17 @@ public class CourseService {
         return courses.stream()
                 .map(CourseSummaryResponse::from)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public CourseDetailResponse getDetail(Long courseId) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ApiException(ErrorCode.COURSE_NOT_FOUND));
+
+        int enrolledCount = (int) enrollmentRepository.countByCourseIdAndStatusIn(
+                courseId, List.of(EnrollmentStatus.PENDING, EnrollmentStatus.CONFIRMED));
+        int remaining = course.getCapacity() - enrolledCount;
+
+        return CourseDetailResponse.from(course, enrolledCount, remaining);
     }
 }

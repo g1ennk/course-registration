@@ -17,3 +17,6 @@ GET http://localhost:8080/courses
 
 ### 강의 목록 - 상태 필터 (OPEN)
 GET http://localhost:8080/courses?status=OPEN
+
+### 강의 상세 조회 (200 OK — enrolledCount·remaining 포함)
+GET http://localhost:8080/courses/1

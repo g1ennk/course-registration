@@ -2,6 +2,7 @@ package hello.courseregistration.course.controller;
 
 import hello.courseregistration.course.domain.CourseStatus;
 import hello.courseregistration.course.dto.request.CourseCreateRequest;
+import hello.courseregistration.course.dto.response.CourseDetailResponse;
 import hello.courseregistration.course.dto.response.CourseResponse;
 import hello.courseregistration.course.dto.response.CourseSummaryResponse;
 import hello.courseregistration.course.service.CourseService;
@@ -31,5 +32,10 @@ public class CourseController {
     public List<CourseSummaryResponse> getList(
             @RequestParam(required = false) CourseStatus status) {
         return courseService.getList(status);
+    }
+
+    @GetMapping("/{courseId}")
+    public CourseDetailResponse getDetail(@PathVariable Long courseId) {
+        return courseService.getDetail(courseId);
     }
 }
