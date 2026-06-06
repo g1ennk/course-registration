@@ -1,6 +1,7 @@
 package hello.courseregistration.course.domain;
 
-import hello.courseregistration.common.exception.IllegalStateTransitionException;
+import hello.courseregistration.common.exception.ApiException;
+import hello.courseregistration.common.exception.ErrorCode;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -31,7 +32,9 @@ class CourseTest {
         Course c = draftCourse();
         c.open();
         assertThatThrownBy(c::open)
-                .isInstanceOf(IllegalStateTransitionException.class);
+                .isInstanceOf(ApiException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INVALID_STATE_TRANSITION);
     }
 
     @Test
@@ -46,7 +49,9 @@ class CourseTest {
     void DRAFT를_close하면_예외() {
         Course c = draftCourse();   // DRAFT 상태 (open 안 함)
         assertThatThrownBy(c::close)
-                .isInstanceOf(IllegalStateTransitionException.class);
+                .isInstanceOf(ApiException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INVALID_STATE_TRANSITION);
     }
 
     @Test

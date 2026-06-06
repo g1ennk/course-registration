@@ -1,6 +1,7 @@
 package hello.courseregistration.enrollment.domain;
 
-import hello.courseregistration.common.exception.IllegalStateTransitionException;
+import hello.courseregistration.common.exception.ApiException;
+import hello.courseregistration.common.exception.ErrorCode;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,7 +31,9 @@ class EnrollmentTest {
         Enrollment e = pendingEnrollment();
         e.confirm();
         assertThatThrownBy(e::confirm)
-                .isInstanceOf(IllegalStateTransitionException.class);
+                .isInstanceOf(ApiException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INVALID_STATE_TRANSITION);
     }
 
     @Test
@@ -55,7 +58,9 @@ class EnrollmentTest {
         Enrollment e = pendingEnrollment();
         e.cancel();                        // PENDING → CANCELLED
         assertThatThrownBy(e::cancel)      // 다시 cancel → 예외
-                .isInstanceOf(IllegalStateTransitionException.class);
+                .isInstanceOf(ApiException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INVALID_STATE_TRANSITION);
     }
 
     @Test

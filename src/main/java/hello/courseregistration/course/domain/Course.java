@@ -1,6 +1,7 @@
 package hello.courseregistration.course.domain;
 
-import hello.courseregistration.common.exception.IllegalStateTransitionException;
+import hello.courseregistration.common.exception.ApiException;
+import hello.courseregistration.common.exception.ErrorCode;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -52,14 +53,14 @@ public class Course {
 
     public void open() {
         if (status != CourseStatus.DRAFT) {
-            throw new IllegalStateTransitionException("DRAFT 상태에서만 OPEN으로 전이할 수 있습니다.");
+            throw new ApiException(ErrorCode.INVALID_STATE_TRANSITION, "DRAFT 상태에서만 OPEN으로 전이할 수 있습니다.");
         }
         this.status = CourseStatus.OPEN;
     }
 
     public void close() {
         if (status != CourseStatus.OPEN) {
-            throw new IllegalStateTransitionException("OPEN 상태에서만 CLOSED로 전이할 수 있습니다.");
+            throw new ApiException(ErrorCode.INVALID_STATE_TRANSITION, "OPEN 상태에서만 CLOSED로 전이할 수 있습니다.");
         }
         this.status = CourseStatus.CLOSED;
     }

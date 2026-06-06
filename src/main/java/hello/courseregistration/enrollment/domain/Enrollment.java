@@ -1,6 +1,7 @@
 package hello.courseregistration.enrollment.domain;
 
-import hello.courseregistration.common.exception.IllegalStateTransitionException;
+import hello.courseregistration.common.exception.ApiException;
+import hello.courseregistration.common.exception.ErrorCode;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -41,14 +42,14 @@ public class Enrollment {
 
     public void confirm() {
         if (status != EnrollmentStatus.PENDING) {
-            throw new IllegalStateTransitionException("PENDING 상태에서만 CONFIRMED로 전이할 수 있습니다.");
+            throw new ApiException(ErrorCode.INVALID_STATE_TRANSITION, "PENDING 상태에서만 CONFIRMED로 전이할 수 있습니다.");
         }
         this.status = EnrollmentStatus.CONFIRMED;
     }
 
     public void cancel() {
         if (status == EnrollmentStatus.CANCELLED) {
-            throw new IllegalStateTransitionException("이미 취소된 신청입니다.");
+            throw new ApiException(ErrorCode.INVALID_STATE_TRANSITION, "이미 취소된 신청입니다.");
         }
         this.status = EnrollmentStatus.CANCELLED;
     }
