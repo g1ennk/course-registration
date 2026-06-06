@@ -131,8 +131,7 @@
 ## 6. 데이터 모델
 
 - User는 별도 엔티티 없이 헤더 ID 값으로만 식별하며, Course에서는 `creator_id`, Enrollment에서는 `classmate_id`로 표현한다.
-- 인덱스: `enrollment(course_id, status)`로 활성 COUNT 및 중복 체크 질의 대상
-- 활성 중복 신청 방지는 Course 행 락 구간 내 검사로 보장하며, 보조로 `(course_id, classmate_id)` 활성 부분 유니크 인덱스를 둘 수 있다.
+- 활성 중복 신청 방지와 정원 초과 방지는 모두 Course 행 비관적 락 구간 내 검사로 보장한다(인덱스·유니크 제약에 의존하지 않음).
 
 ```mermaid
 erDiagram
