@@ -141,6 +141,78 @@
 - 응답은 공통 에러 바디로 통일하고, 검증 실패만 `errors[]`에 필드 상세를 담는다.
 - 리소스별 예외 클래스(CourseNotFoundException 등)는 과제 규모에 비해 과하다고 판단해 두지 않았다.
 
+### 5-3. 내 신청 목록 조회 — N+1 회피
+
+#### 문제: 연관관계 없는 조인
+
+- `GET /enrollments/me`는 신청마다 강의 제목(`courseTitle`)을 함께 반환한다.
+- 그런데 `Enrollment`는 `Course`와 객체 연관관계 없이 `course_id`(FK 값)만 가진다.
+- 가장 단순한 구현은 신청 목록을 조회한 뒤 각 항목마다 `courseRepository.findById(courseId)`로 제목을 채우는 것인데, 이러면 목록 1번 + 항목 N번 = N+1 쿼리가
+  발생한다.
+
+```
+단순 구현:  SELECT ... FROM enrollment WHERE classmate_id = ?      -- 1
+            SELECT ... FROM course WHERE id = ?   (신청 1건)        -- +1
+            SELECT ... FROM course WHERE id = ?   (신청 2건)        -- +1
+            ...                                   (신청 N건)        -- +N
+            => 1 + N 쿼리
+
+조인:       SELECT e.*, c.title FROM enrollment e
+            JOIN course c ON c.id = e.course_id
+            WHERE e.classmate_id = ? ORDER BY e.created_at DESC     -- 1
+            => 1 쿼리
+```
+
+#### 해결책 비교
+
+| 방법                               | 동작                            | 적합 상황                | 이 과제         |
+|----------------------------------|-------------------------------|----------------------|--------------|
+| JPQL JOIN (생성자 표현식 projection)   | SQL 한 번에 조인해 필요한 필드만 DTO로 가져옴 | 같은 DB에 있고 조인이 가능     | **채택**       |
+| IN절 배치 (`where courseId in (…)`) | 부모 N건의 자식을 IN절로 한 번에 조회       | JOIN이 부적절·불가, 컬렉션 로딩 | 단건 제목 조회엔 과함 |
+
+같은 DB 안이면 **JOIN이 1순위**다. SQL 레벨에서 끝나 네트워크 왕복이 없고 가장 단순하다. IN절 배치는 JOIN이 불가능하거나 컬렉션을 로딩할 때의 대안이다.
+
+#### 선택: JPQL JOIN (생성자 표현식 projection)
+
+현 과제는 `Enrollment`와 `Course`가 같은 DB에 있고 조인이 단순하므로 JPQL 생성자 표현식이 가장 적절하다고 판단했다.
+
+**구현: before / after**
+
+```text
+// before — 서비스에서 신청을 조회한 뒤, 항목마다 Course를 다시 조회 (N+1)
+return enrollmentRepository.findByClassmateIdOrderByCreatedAtDesc(classmateId).stream()
+        .map(e -> {
+            // 신청마다 +1 쿼리
+            String courseTitle = courseRepository.findById(e.getCourseId())
+                    .map(Course::getTitle).orElse(null);
+            return new MyEnrollmentResponse(
+                    e.getId(), e.getCourseId(), courseTitle, e.getStatus(), e.getCreatedAt());
+        })
+        .toList();
+```
+
+```text
+// after — 조인 projection 한 번으로 courseTitle까지 채워 반환 (1 쿼리)
+@Query("""
+        select new hello.courseregistration.enrollment.dto.response.MyEnrollmentResponse(
+            e.id, e.courseId, c.title, e.status, e.createdAt)
+        from Enrollment e join Course c on c.id = e.courseId
+        where e.classmateId = :classmateId
+        order by e.createdAt desc
+        """)
+List<MyEnrollmentResponse> findMyEnrollments(@Param("classmateId") Long classmateId);
+
+// service — 위임만
+return enrollmentRepository.findMyEnrollments(classmateId);
+```
+
+**결과: before / after** (신청 12건 조회, `MyEnrollmentNPlusOneTest`로 측정)
+
+| 구분     | 조회 쿼리 수       | 비고                       |
+|--------|---------------|--------------------------|
+| before | `13` (1 + 12) | 신청 수 N에 정비례해 증가(`1 + N`) |
+| after  | `1`           | 신청 수와 무관하게 단일 조인 쿼리      |
+
 ## 6. 데이터 모델
 
 - User는 별도 엔티티 없이 헤더 ID 값으로만 식별하며, Course에서는 `creator_id`, Enrollment에서는 `classmate_id`로 표현한다.
@@ -495,15 +567,16 @@ X-User-Id: 100
 
 **현재 테스트 구성**
 
-| 테스트 | 위치 | 유형 | 검증 내용 |
-|---|---|---|---|
-| `CourseTest` | `course/domain` | 단위 | 상태 전이(`DRAFT`→`OPEN`→`CLOSED`)·불법 전이 예외, `changeStatusTo` 디스패치, 소유자 판별, 기간 불변식(시작일 ≤ 종료일) |
-| `EnrollmentTest` | `enrollment/domain` | 단위 | 신청 상태 전이(`PENDING`→`CONFIRMED`/`CANCELLED`)·불법 전이 예외, 소유자 판별, 활성 여부 판별 |
-| `CourseRepositoryTest` | `course/repository` | `@DataJpaTest` | 공개 목록 조회 시 `DRAFT` 제외 |
-| `EnrollmentRepositoryTest` | `enrollment/repository` | `@DataJpaTest` | 활성 신청(`PENDING`+`CONFIRMED`) 집계 — 취소·타 강의 제외, 활성 중복 신청 판별 |
-| `CourseStatusApiTest` | `course/controller` | `@SpringBootTest` | 상태 변경 API 통합 — 검증 순서(404→403→400)·정상 전이 |
-| `EnrollmentApiTest` | `enrollment/controller` | `@SpringBootTest` | 수강 신청 API 통합 — 검증 순서(404→400→409중복→409만석)·정상 신청 |
-| `EnrollmentStatusApiTest` | `enrollment/controller` | `@SpringBootTest` | 결제 확정·취소 API 통합 — 검사 순서(404→403→400)·정상 전이 |
+| 테스트                        | 위치                      | 유형                | 검증 내용                                                                                     |
+|----------------------------|-------------------------|-------------------|-------------------------------------------------------------------------------------------|
+| `CourseTest`               | `course/domain`         | 단위                | 상태 전이(`DRAFT`→`OPEN`→`CLOSED`)·불법 전이 예외, `changeStatusTo` 디스패치, 소유자 판별, 기간 불변식(시작일 ≤ 종료일) |
+| `EnrollmentTest`           | `enrollment/domain`     | 단위                | 신청 상태 전이(`PENDING`→`CONFIRMED`/`CANCELLED`)·불법 전이 예외, 소유자 판별, 활성 여부 판별                    |
+| `CourseRepositoryTest`     | `course/repository`     | `@DataJpaTest`    | 공개 목록 조회 시 `DRAFT` 제외                                                                     |
+| `EnrollmentRepositoryTest` | `enrollment/repository` | `@DataJpaTest`    | 활성 신청(`PENDING`+`CONFIRMED`) 집계·활성 중복 판별, 내 신청 목록 조인 조회(`courseTitle`·최신순)                |
+| `CourseStatusApiTest`      | `course/controller`     | `@SpringBootTest` | 상태 변경 API 통합 — 검증 순서(404→403→400)·정상 전이                                                   |
+| `EnrollmentApiTest`        | `enrollment/controller` | `@SpringBootTest` | 수강 신청 API 통합 — 검증 순서(404→400→409중복→409만석)·정상 신청                                           |
+| `EnrollmentStatusApiTest`  | `enrollment/controller` | `@SpringBootTest` | 결제 확정·취소 API 통합 — 검사 순서(404→403→400)·정상 전이                                                |
+| `MyEnrollmentNPlusOneTest` | `enrollment/controller` | `@SpringBootTest` | 내 신청 목록 N+1 회귀 — 신청 12건 조회가 단일 쿼리(§5-3)                                                   |
 
 ## 9. 미구현 / 제약사항
 

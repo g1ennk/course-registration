@@ -9,3 +9,7 @@ X-User-Id: 100
 ### 수강 취소 (200 OK, PENDING/CONFIRMED → CANCELLED, 소유자만)
 PATCH http://localhost:8080/enrollments/1/cancel
 X-User-Id: 100
+
+### 내 신청 목록 (200 OK, CANCELLED 포함 최신순, courseTitle 포함)
+GET http://localhost:8080/enrollments/me
+X-User-Id: 100

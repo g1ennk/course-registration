@@ -8,10 +8,13 @@ import hello.courseregistration.course.repository.CourseRepository;
 import hello.courseregistration.enrollment.domain.Enrollment;
 import hello.courseregistration.enrollment.domain.EnrollmentStatus;
 import hello.courseregistration.enrollment.dto.response.EnrollmentResponse;
+import hello.courseregistration.enrollment.dto.response.MyEnrollmentResponse;
 import hello.courseregistration.enrollment.repository.EnrollmentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -59,6 +62,12 @@ public class EnrollmentService {
         Enrollment enrollment = ownedEnrollment(enrollmentId, classmateId);
         enrollment.cancel();
         return EnrollmentResponse.from(enrollment);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MyEnrollmentResponse> myEnrollments(Long classmateId) {
+        // 조인 쿼리로 courseTitle까지 단일 쿼리 조회 (N+1 회피)
+        return enrollmentRepository.findMyEnrollments(classmateId);
     }
 
     // 신청 검사 순서 헬퍼 메서드: 신청이 존재하는지(404) -> 소유자인지(403)

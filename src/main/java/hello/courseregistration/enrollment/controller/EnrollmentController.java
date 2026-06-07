@@ -1,10 +1,13 @@
 package hello.courseregistration.enrollment.controller;
 
 import hello.courseregistration.enrollment.dto.response.EnrollmentResponse;
+import hello.courseregistration.enrollment.dto.response.MyEnrollmentResponse;
 import hello.courseregistration.enrollment.service.EnrollmentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -33,4 +36,11 @@ public class EnrollmentController {
             @RequestHeader("X-User-Id") Long classmateId) {
         return enrollmentService.cancel(enrollmentId, classmateId);
     }
+
+    @GetMapping("/enrollments/me")
+    public List<MyEnrollmentResponse> myEnrollments(
+            @RequestHeader("X-User-Id") Long classmateId) {
+        return enrollmentService.myEnrollments(classmateId);
+    }
+
 }
