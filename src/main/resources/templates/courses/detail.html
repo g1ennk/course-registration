@@ -1,0 +1,52 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('강의 상세')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: topbar}"></nav>
+<div class="container">
+    <div th:replace="~{fragments/layout :: alerts}"></div>
+
+    <a class="btn btn-sm btn-outline-secondary mb-3" th:href="@{/web/courses}">← 목록</a>
+
+    <div class="card">
+        <div class="card-body">
+            <h3 class="card-title">
+                <span th:text="${course.title()}"></span>
+                <span class="badge bg-secondary align-middle" th:text="${course.status()}"></span>
+            </h3>
+            <p class="text-muted" th:text="${course.description()}"></p>
+            <ul class="list-unstyled">
+                <li>가격: <span th:text="${course.price()}"></span></li>
+                <li>정원 <strong th:text="${course.capacity()}"></strong>
+                    · 신청 <strong th:text="${course.enrolledCount()}"></strong>
+                    · 잔여 <strong th:text="${course.remaining()}"></strong></li>
+                <li>기간: <span th:text="${course.startDate()}"></span> ~ <span th:text="${course.endDate()}"></span></li>
+                <li>크리에이터: <span th:text="${course.creatorId()}"></span></li>
+            </ul>
+
+            <!-- 소유자(크리에이터): 상태 전이 -->
+            <div th:if="${currentUserId != null and currentUserId == course.creatorId()}">
+                <hr>
+                <span class="me-2">상태 변경:</span>
+                <form class="d-inline" th:action="@{/web/courses/{id}/status(id=${course.id()})}" method="post">
+                    <input type="hidden" name="target" value="OPEN">
+                    <button class="btn btn-sm btn-success" type="submit">OPEN</button>
+                </form>
+                <form class="d-inline" th:action="@{/web/courses/{id}/status(id=${course.id()})}" method="post">
+                    <input type="hidden" name="target" value="CLOSED">
+                    <button class="btn btn-sm btn-dark" type="submit">CLOSED</button>
+                </form>
+            </div>
+
+            <!-- 비소유자(수강생): 신청 -->
+            <div th:unless="${currentUserId != null and currentUserId == course.creatorId()}">
+                <hr>
+                <form th:action="@{/web/courses/{id}/enroll(id=${course.id()})}" method="post">
+                    <button class="btn btn-primary" type="submit">수강 신청</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

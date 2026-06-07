@@ -1,0 +1,17 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('오류')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: topbar}"></nav>
+<div class="container">
+    <div class="alert alert-danger">
+        <h5 class="alert-heading">
+            <span th:text="${status}">400</span>
+            <span th:text="${reason}">Bad Request</span>
+        </h5>
+        <p class="mb-0" th:text="${message}">요청을 처리할 수 없습니다</p>
+    </div>
+    <a class="btn btn-outline-secondary" th:href="@{/web/courses}">← 강의 목록</a>
+</div>
+</body>
+</html>

@@ -1,0 +1,41 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('강의 목록')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: topbar}"></nav>
+<div class="container">
+    <div th:replace="~{fragments/layout :: alerts}"></div>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="mb-0">강의 목록</h3>
+        <a class="btn btn-primary" th:href="@{/web/courses/new}">강의 등록</a>
+    </div>
+
+    <form class="mb-3" method="get" th:action="@{/web/courses}">
+        <select name="status" class="form-select d-inline-block w-auto" onchange="this.form.submit()">
+            <option value="" th:selected="${status == null}">전체 (OPEN/CLOSED)</option>
+            <option th:each="s : ${statuses}" th:value="${s}" th:text="${s}"
+                    th:selected="${status != null and status.name() == s.name()}"></option>
+        </select>
+    </form>
+
+    <table class="table table-hover align-middle">
+        <thead>
+        <tr><th>ID</th><th>제목</th><th>가격</th><th>정원</th><th>상태</th></tr>
+        </thead>
+        <tbody>
+        <tr th:each="c : ${courses}">
+            <td th:text="${c.id()}"></td>
+            <td><a th:href="@{/web/courses/{id}(id=${c.id()})}" th:text="${c.title()}"></a></td>
+            <td th:text="${c.price()}"></td>
+            <td th:text="${c.capacity()}"></td>
+            <td><span class="badge bg-secondary" th:text="${c.status()}"></span></td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(courses)}">
+            <td colspan="5" class="text-center text-muted">강의가 없습니다</td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+</body>
+</html>

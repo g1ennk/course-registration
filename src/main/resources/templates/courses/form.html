@@ -1,0 +1,49 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('강의 등록')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: topbar}"></nav>
+<div class="container" style="max-width:640px">
+    <div th:replace="~{fragments/layout :: alerts}"></div>
+    <h3 class="mb-3">강의 등록</h3>
+
+    <form th:action="@{/web/courses}" th:object="${form}" method="post">
+        <div class="mb-3">
+            <label class="form-label">제목</label>
+            <input class="form-control" type="text" th:field="*{title}">
+            <div class="text-danger small" th:errors="*{title}"></div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">설명</label>
+            <textarea class="form-control" rows="2" th:field="*{description}"></textarea>
+        </div>
+        <div class="row">
+            <div class="col mb-3">
+                <label class="form-label">가격</label>
+                <input class="form-control" type="number" th:field="*{price}">
+                <div class="text-danger small" th:errors="*{price}"></div>
+            </div>
+            <div class="col mb-3">
+                <label class="form-label">정원</label>
+                <input class="form-control" type="number" th:field="*{capacity}">
+                <div class="text-danger small" th:errors="*{capacity}"></div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col mb-3">
+                <label class="form-label">시작일</label>
+                <input class="form-control" type="date" th:field="*{startDate}">
+                <div class="text-danger small" th:errors="*{startDate}"></div>
+            </div>
+            <div class="col mb-3">
+                <label class="form-label">종료일</label>
+                <input class="form-control" type="date" th:field="*{endDate}">
+                <div class="text-danger small" th:errors="*{endDate}"></div>
+            </div>
+        </div>
+        <button class="btn btn-primary" type="submit">등록</button>
+        <a class="btn btn-outline-secondary" th:href="@{/web/courses}">취소</a>
+    </form>
+</div>
+</body>
+</html>

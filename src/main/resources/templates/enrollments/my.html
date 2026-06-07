@@ -1,0 +1,42 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('내 신청 목록')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: topbar}"></nav>
+<div class="container">
+    <div th:replace="~{fragments/layout :: alerts}"></div>
+    <h3 class="mb-3">내 신청 목록</h3>
+
+    <div th:if="${currentUserId == null}" class="alert alert-warning">
+        상단바에서 현재 사용자를 먼저 설정하세요.
+    </div>
+
+    <table class="table align-middle">
+        <thead>
+        <tr><th>ID</th><th>강의</th><th>상태</th><th>신청일</th><th>액션</th></tr>
+        </thead>
+        <tbody>
+        <tr th:each="e : ${enrollments}">
+            <td th:text="${e.id()}"></td>
+            <td th:text="${e.courseTitle()}"></td>
+            <td><span class="badge bg-secondary" th:text="${e.status()}"></span></td>
+            <td th:text="${e.createdAt()}"></td>
+            <td>
+                <form class="d-inline" th:action="@{/web/enrollments/{id}/confirm(id=${e.id()})}" method="post">
+                    <button class="btn btn-sm btn-success" type="submit"
+                            th:disabled="${e.status().name() != 'PENDING'}">확정</button>
+                </form>
+                <form class="d-inline" th:action="@{/web/enrollments/{id}/cancel(id=${e.id()})}" method="post">
+                    <button class="btn btn-sm btn-outline-danger" type="submit"
+                            th:disabled="${e.status().name() == 'CANCELLED'}">취소</button>
+                </form>
+            </td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(enrollments)}">
+            <td colspan="5" class="text-center text-muted">신청 내역이 없습니다</td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+</body>
+</html>
