@@ -1,23 +1,36 @@
 # 과제 A - 수강 신청 시스템
 
-> Backend · CRUD + 비즈니스 규칙
+> Backend: CRUD + 비즈니스 규칙
 >
 > 핵심 키워드: 상태 전이, 정원 관리, 동시성 제어
 
+## 목차
+
+1. [프로젝트 개요](#1-프로젝트-개요)
+2. [구현 범위](#2-구현-범위)
+3. [기술 스택 및 구조](#3-기술-스택-및-구조)
+4. [요구사항 해석 및 가정](#4-요구사항-해석-및-가정)
+5. [설계 결정과 이유](#5-설계-결정과-이유)
+6. [데이터 모델 설명](#6-데이터-모델-설명)
+7. [API 목록 및 예시](#7-api-목록-및-예시)
+8. [실행 및 테스트](#8-실행-및-테스트)
+9. [미구현 / 제약사항](#9-미구현--제약사항)
+10. [AI 활용 범위](#10-ai-활용-범위)
+
 ## 1. 프로젝트 개요
 
-크리에이터가 강의를 개설할 때 수강 정원, 가격, 기간을 설정하면 클래스메이트가 수강 신청을 한다.
+크리에이터(강사)가 강의를 열고 정원, 가격, 기간을 정하면, 클래스메이트(수강생)가 원하는 강의에 수강 신청을 한다.
 
-정원이 차면 신청이 거부되고, 신청 후 결제가 완료되어야 수강이 확정되고, 수강 취소도 가능하다.
+정원이 차면 신청은 거부된다. 결제를 마치면 수강이 확정되고, 신청 및 확정 건은 취소할 수 있다.
 
-프로젝트 핵심은 마지막 남은 한 자리에 여러 명이 동시에 신청할 때 이를 어떻게 제어하느냐이다.
+이 과제의 핵심은 마지막 한 자리를 두고 여러 명이 경쟁할 때 동시성을 어떻게 처리하느냐이다.
 
 ## 2. 구현 범위
 
 ### 필수 구현
 
 1. 강의 관리
-    - 강의 등록: 제목, 설명, 가격, 정원, 수강 기간
+    - 강의 등록: 제목, 설명, 가격, 정원, 수강 기간(시작일/종료일)
     - 강의 상태
         - `DRAFT`: 초안 (신청 불가)
         - `OPEN`: 모집 중 (신청 가능)
@@ -35,57 +48,79 @@
     - 내 수강 신청 목록 조회
 3. 정원 관리 규칙
     - 강의별 최대 정원을 초과한 신청은 거부
-    - 동시에 여러 사람이 마지막 자리 신청 시 고려 (동시성 처리)
+    - 동시에 여러 사람이 마지막 자리 신청 시 동시성 처리
 
 ### 선택 구현
 
 1. 수강 신청 시 취소 가능 기간 제한
-2. 대기열 가능
+2. 대기열 기능
 3. 강의별 수강생 목록 조회(크리에이터 전용)
-4. 신청 내용 페이지네이션
+4. 신청 내역 페이지네이션
 
-## 3. 기술 스택
+## 3. 기술 스택 및 구조
 
 - 언어: Java 21
 - 프레임워크: Spring Boot 4.0.6
 - ORM: Spring Data JPA
 - DB: H2
 
+### 패키지 구조
+
+```
+src/main/java/hello/courseregistration
+├── common
+│   ├── exception   # ApiException/ErrorCode/GlobalExceptionHandler
+│   └── response    # ErrorResponse
+├── course          # 강의 도메인
+│   └── controller/service/repository/domain/dto
+└── enrollment      # 수강 신청 도메인
+    └── controller/service/repository/domain/dto
+```
+
 ## 4. 요구사항 해석 및 가정
 
 ### 도메인 규칙
 
-1. 인증/인가: `X-User-Id` 헤더(Long)으로 간단히 식별
-2. 정원 점유(활성 상태): 신청을 완료했지만 결제는 아직 안 한 `PENDING`과 신청 후 결제까지 완료한 `CONFIRMED`가 자리를 차지한다.
-    - `ACTIVE` = `PENDING` + `CONFIRMED`
-    - `INACTIVE` = `CANCELLED`
-3. 취소 규칙: 활성 상태 시 즉시 취소 가능하고, 취소 시 즉시 점유 해제 (기간 제한은 선택 구현이므로 추후 구현 가능)
-    - 취소 후 재신청 가능하다고 가정하여 `CANCELLED` 이력이 있어도 `ACTIVE` 신청이 없으면 허용
-4. 결제 확정: `PENDING` → `CONFIRMED` 단순 상태 변경
-    - 결제 확정과 취소는 신청(Enrollment) 상태만 검사한다. 강의가 `CLOSED`로 마감된 뒤에도 이미 신청된 건의 결제 및 취소는 가능하다 (마감 = 신규 신청 차단이지, 기존 신청의 처리 중단이
-      아님)
+1. 인증/인가: `X-User-Id` 헤더(Long)로 간단히 식별
+2. 정원 점유(활성 상태): `PENDING`(신청, 결제 대기)과 `CONFIRMED`(결제 완료)가 자리를 차지한다.
+    - 활성 = `PENDING` + `CONFIRMED`, 비활성 = `CANCELLED` (별도 상태값이 아닌 분류 개념)
+3. 취소 규칙: 활성 상태면 즉시 취소할 수 있고, 취소 시 즉시 점유를 해제한다.
+    - 취소 후 재신청은 활성 신청이 없으면 허용한다(`CANCELLED` 이력 무관).
+4. 결제 확정: `PENDING` → `CONFIRMED`로 바꾸는 단순 상태 변경이다.
+    - 신청 상태 전이
+        - `PENDING` → `CONFIRMED`(confirm)
+        - `PENDING`/`CONFIRMED` → `CANCELLED`(cancel)
+        - 그 외 전이는 불법으로 `400`을 반환한다.
+    - 결제 확정과 취소는 신청(Enrollment) 상태만 검사한다. 강의가 `CLOSED`로 마감된 뒤에도 기존 신청의 confirm/cancel은 가능하다(마감 = 신규 신청 차단).
 5. 강의 상태 전이: `DRAFT` → `OPEN` → `CLOSED` (단방향)
-    - 강의 신청은 `OPEN`일 때만
-    - 상태 변경은 크리에이터(생성자)만
-6. 강의 상세 조회 시 활성 신청 인원(`enrolledCount` = `PENDING` + `CONFIRMED`), 정원(`capacity`), 잔여석(`remaining` = `capacity` -
-   `enrolledCount`)을 함께 반환한다.
+    - 강의 신청은 `OPEN`일 때만 가능
+    - 상태 변경은 크리에이터(생성자)만 가능
+6. 강의 상세 조회 시 다음을 함께 반환
+    - 활성 신청 인원(`enrolledCount` = `PENDING` + `CONFIRMED`)
+    - 정원(`capacity`)
+    - 잔여석(`remaining` = `capacity` - `enrolledCount`)
 7. 수강 신청 검증 순서: courseId 존재 여부(404) → 강의 `OPEN` 여부(400) → 중복 신청(409) → 정원 초과(409)
-8. 역할 검증 없음: 별도 User 엔티티가 없어 크리에이터/클래스메이트 역할을 강제하지 않는다. 동일 사용자가 강의를 만들면서 다른 강의에 신청할 수 있고, 본인 강의에 본인이 신청하는 것도 허용한다(
-   소유자 검사는 상태 전이·confirm·cancel에만 적용).
-9. 강의 목록 조회는 공개 목록으로, `DRAFT`(초안)는 노출하지 않으며 `status` 필터값으로도 허용하지 않는다(요청 시 `400`). 초안 확인은 상세 조회(id 직접 접근)로 대신한다. 따라서 목록
-   엔드포인트는 `X-User-Id` 헤더를 사용하지 않는다.
+8. 역할 검증 없음: 별도 User 엔티티 없이 크리에이터/클래스메이트 역할을 강제하지 않는다.
+    - 본인 강의에 본인이 신청하는 것도 허용한다(소유자 검사는 상태 전이, confirm, cancel에만 적용).
+9. 목록 조회는 공개 목록
+    - `DRAFT`(초안)는 목록에 노출하지 않고 `status` 필터 값으로도 허용하지 않는다(요청 시 `400`). 초안은 상세 조회로만 접근한다.
+    - `OPEN`과 `CLOSED` 상태의 강의 목록은 누구나 확인할 수 있다.
 
 ### 에러 규약
 
-| HTTP 상태         | 발생 상황                                                                                                                 |
-|-----------------|-----------------------------------------------------------------------------------------------------------------------|
-| 400 Bad Request | 입력값 검증 실패<br>불법 상태 전이 (Course / Enrollment)<br>`OPEN`이 아닌 강의 신청<br>잘못된 쿼리 파라미터<br>`X-User-Id` 헤더 누락·형식 오류(Long 변환 실패) |
-| 403 Forbidden   | 강의 소유자(creator)가 아닌 사용자의 상태 전이 요청<br>신청 소유자(classmate)가 아닌 사용자의 confirm/cancel 요청                                     |
-| 404 Not Found   | 존재하지 않는 courseId<br>존재하지 않는 enrollmentId                                                                              |
-| 409 Conflict    | 정원 초과: 활성 신청 수 (`PENDING` + `CONFIRMED` >= capacity)<br>중복 신청: 같은 강의에 이미 `PENDING` 또는 `CONFIRMED` 신청 존재               |
+| HTTP 상태         | 에러 코드                      | 발생 상황                                                                                                       |
+|-----------------|----------------------------|-------------------------------------------------------------------------------------------------------------|
+| 400 Bad Request | `VALIDATION_FAILED`        | 입력값 검증 실패(필드 단위, `errors[]`에 상세)                                                                            |
+| 400 Bad Request | `INVALID_REQUEST`          | 교차검증 위반(시작일 > 종료일)<br>잘못된 쿼리 파라미터<br>`X-User-Id` 헤더 누락이나 형식 오류(Long 변환 실패)<br>요청 본문 파싱 실패(깨진 JSON이나 잘못된 enum 값) |
+| 400 Bad Request | `INVALID_STATE_TRANSITION` | 불법 상태 전이 (Course / Enrollment)                                                                              |
+| 400 Bad Request | `COURSE_NOT_OPEN`          | `OPEN`이 아닌 강의 신청                                                                                            |
+| 403 Forbidden   | `FORBIDDEN`                | 강의 소유자(creator)가 아닌 사용자의 상태 전이 요청<br>신청 소유자(classmate)가 아닌 사용자의 confirm/cancel 요청                           |
+| 404 Not Found   | `COURSE_NOT_FOUND`         | 존재하지 않는 courseId                                                                                            |
+| 404 Not Found   | `ENROLLMENT_NOT_FOUND`     | 존재하지 않는 enrollmentId                                                                                        |
+| 409 Conflict    | `COURSE_FULL`              | 정원 초과: 활성 신청 수(`PENDING` + `CONFIRMED`) ≥ capacity                                                          |
+| 409 Conflict    | `DUPLICATE_ENROLLMENT`     | 중복 신청: 같은 강의에 이미 `PENDING`/`CONFIRMED` 신청 존재                                                                |
 
-**공통 에러 응답 바디** — 비즈니스·검증 에러로 인한 4xx 응답은 아래 형식을 따른다. `errors[]`는 입력값 검증 실패 시 필드별 상세(`field`·`message`)를 담고, 그 외 에러에서는 빈
-배열이다.
+### 공통 에러 응답 바디
 
 ```json
 {
@@ -97,56 +132,60 @@
 
 ## 5. 설계 결정과 이유
 
-### 5-1. 동시성 제어 — 비관적 락
+### 5-1. 동시성 제어: 비관적 락
 
 #### 대안 비교
 
-| 구분      | 비관적 락                                             | 낙관적 락                                                               | Redis 분산 락                                              |
-|---------|---------------------------------------------------|---------------------------------------------------------------------|---------------------------------------------------------|
-| 동작 방식   | 트랜잭션 시작 시 X-Lock으로 대상 행 선점, 커밋/롤백 전까지 후발 트랜잭션 블로킹 | 읽기 시 version 조회, 커밋 시점에 version 불일치 → OptimisticLockException → 재시도 | SETNX + TTL로 락 획득, Pub/Sub으로 해제 감지, Watchdog이 TTL 자동 연장 |
-| 충돌 처리   | 대기(블로킹)                                           | 예외 → 애플리케이션 재시도                                                     | 대기(블로킹)                                                 |
-| 처리량     | 낮음                                                | 높음                                                                  | 중간                                                      |
-| 데드락     | 위험 있음                                             | 없음                                                                  | 없음                                                      |
-| 추가 인프라  | 불필요                                               | 불필요                                                                 | Redis 필요                                                |
-| 멀티 인스턴스 | DB 공유 시 유효                                        | DB 공유 시 유효                                                          | 완전 지원                                                   |
-| 선택 기준   | 높은 충돌 빈도                                          | 낮은 충돌 빈도                                                            | 멀티 인스턴스 환경                                              |
-| 적합한 상황  | 수강 신청, 재고 차감, 좌석 예약                               | 프로필 수정, 설정 업데이트                                                     | 쿠폰 발급, 선착순 이벤트                                          |
-| 이 과제    | 적합                                                | 재시도 폭풍 위험                                                           | 단일 인스턴스 과잉                                              |
+| 구분     | 비관적 락                                                   | 낙관적 락                                                               |
+|--------|---------------------------------------------------------|---------------------------------------------------------------------|
+| 동작 방식  | 트랜잭션 시작 시 X-Lock(배타 락)으로 대상 행 선점, 커밋/롤백 전까지 후발 트랜잭션 블로킹 | 읽기 시 version 조회, 커밋 시점에 version 불일치 → OptimisticLockException → 재시도 |
+| 충돌 처리  | 대기(블로킹)                                                 | 예외 → 애플리케이션 재시도                                                     |
+| 처리량    | 낮음                                                      | 높음                                                                  |
+| 데드락    | 위험 있음                                                   | 없음                                                                  |
+| 선택 기준  | 높은 충돌 빈도                                                | 낮은 충돌 빈도                                                            |
+| 적합한 상황 | 수강 신청, 재고 차감, 좌석 예약                                     | 프로필 수정, 설정 업데이트                                                     |
+| 이 과제   | 적합                                                      | 재시도 폭풍 위험                                                           |
+
+> 멀티 인스턴스 환경이라면 Redis 등 분산 락도 후보지만, 이 과제는 단일 인스턴스에 단일 DB라 과한 설계다.
 
 #### 비관적 락 선택 이유
 
-다음과 같은 이유로 수강 신청 시스템 동시성 처리로 비관적 락을 선택했다.
+수강 신청 동시성 제어로 비관적 락을 선택한 이유는 다음과 같다.
 
-- 높은 충돌 빈도: 수강 신청은 인기 강의의 마지막 자리를 다수의 학생이 동시에 노리는 구조로, 같은 행(정원)에 대한 경쟁이 빈번하게 발생한다. 충돌이 드문 상황을 전제하는 낙관적 락과는 적합하지 않다.
-- 낙관적 락 배제: 충돌이 많은 환경에서 낙관적 락을 적용하면 `OptimisticLockException` 발생 후 재시도가 반복되어 처리 지연 및 DB 부하가 오히려 증가한다. 수강 신청처럼 경쟁이
-  집중되는 도메인에서는 재시도 폭풍이 현실적인 위험이다.
-- 강한 일관성 요구: 정원 초과는 비즈니스 규칙상 절대 허용되지 않는다. 비관적 락은 트랜잭션 시작 시점에 행을 선점하여 잔여 정원 확인과 정원 감소를 단일 직렬 흐름으로 처리하므로 초과 등록을 원천
-  차단한다.
-- 분산 락 배제: 현재 과제는 단일 인스턴스 + 단일 DB 환경으로, Redis 분산 락은 추가 인프라 비용 대비 실익이 없는 과잉 설계다. 스케일아웃이 필요한 시점에 Redisson 기반 분산 락으로
-  전환을 고려할 수 있다.
+1. 높은 충돌 빈도
+    - 인기 강의의 마지막 한 자리를 여러 명이 동시에 노린다. 같은 행(정원)에 경쟁이 몰리므로, 충돌이 드물다고 전제하는 낙관적 락과는 맞지 않는다.
+    - 낙관적 락으로 처리 시 충돌이 잦으면 `OptimisticLockException`으로 재시도가 반복돼 오히려 느려지고 DB 부하만 커진다.
+2. 강한 일관성
+    - 정원 초과는 절대 허용되면 안 되기에 비관적 락으로 행을 먼저 잠그고 '확인 → 등록'을 한 트랜잭션에서 원자적으로 처리해 초과 등록을 막는다.
+3. 분산 락 배제
+    - 단일 인스턴스에 단일 DB 환경이라 분산 락(Redis 등)은 과한 설계다. 멀티 인스턴스로 확장하면 그때 분산 락을 검토할 수 있다.
 
 #### 구현 시퀀스
 
-수강 신청(`POST /courses/{courseId}/enrollments`)은 단일 쓰기 트랜잭션(`@Transactional`)으로 처리하며, 다음 순서를 따른다.
+수강 신청(`POST /courses/{courseId}/enrollments`)은 단일 트랜잭션(`@Transactional`)으로 다음 순서를 따른다.
 
 1. `courseId`로 Course 행을 비관적 쓰기 락으로 조회 (`SELECT ... FOR UPDATE`, JPA `@Lock(PESSIMISTIC_WRITE)`)
 2. 강의가 `OPEN` 상태인지 확인 — 아니면 `400`
 3. 같은 `classmate_id`의 활성 신청(`PENDING`/`CONFIRMED`) 존재 여부 확인 — 있으면 `409`(중복)
-4. 활성 신청 수를 COUNT하여 `capacity`와 비교 — 초과면 `409`(만석)
+4. 활성 신청 수를 COUNT하여 `capacity`와 비교 — 초과면 `409`(정원 초과)
 5. `PENDING` 신청 INSERT 후 커밋
 
-### 5-2. 예외 처리 — ApiException + ErrorCode
+#### 데드락과 격리 수준
 
-- 예외는 `ApiException` 하나. HTTP 상태·코드·메시지는 `ErrorCode` enum이 갖는다. 비즈니스 예외 핸들러도 하나다.
+- 트랜잭션당 Course 1건만 한 지점에서 잠그므로, 락 교차 획득에 의한 데드락이 없다.
+- 정합성은 격리 수준이 아니라 X-Lock에 의존한다 — READ_COMMITTED에서도 후발 트랜잭션이 같은 행에서 블로킹되어 '확인 → 등록'이 직렬화된다.
+
+### 5-2. 예외 처리: ApiException + ErrorCode
+
+- 예외는 `ApiException` 하나로, HTTP 상태/코드/메시지는 `ErrorCode` enum이 갖는다. 비즈니스 예외 핸들러도 하나다.
 - 응답은 공통 에러 바디로 통일하고, 검증 실패만 `errors[]`에 필드 상세를 담는다.
-- 리소스별 예외 클래스(CourseNotFoundException 등)는 과제 규모에 비해 과하다고 판단해 두지 않았다.
 
-### 5-3. 내 신청 목록 조회 — N+1 회피
+### 5-3. 내 신청 목록 조회: N+1 회피
 
 #### 문제: 연관관계 없는 조인
 
 - `GET /enrollments/me`는 신청마다 강의 제목(`courseTitle`)을 함께 반환한다.
-- 그런데 `Enrollment`는 `Course`와 객체 연관관계 없이 `course_id`(FK 값)만 가진다.
+- 그런데 `Enrollment`는 `Course`와 객체 연관관계 없이 `course_id`(FK 값)만 가진다(6. 데이터 모델 참고).
 - 가장 단순한 구현은 신청 목록을 조회한 뒤 각 항목마다 `courseRepository.findById(courseId)`로 제목을 채우는 것인데, 이러면 목록 1번 + 항목 N번 = N+1 쿼리가
   발생한다.
 
@@ -163,18 +202,10 @@
             => 1 쿼리
 ```
 
-#### 해결책 비교
-
-| 방법                               | 동작                            | 적합 상황                | 이 과제         |
-|----------------------------------|-------------------------------|----------------------|--------------|
-| JPQL JOIN (생성자 표현식 projection)   | SQL 한 번에 조인해 필요한 필드만 DTO로 가져옴 | 같은 DB에 있고 조인이 가능     | **채택**       |
-| IN절 배치 (`where courseId in (…)`) | 부모 N건의 자식을 IN절로 한 번에 조회       | JOIN이 부적절·불가, 컬렉션 로딩 | 단건 제목 조회엔 과함 |
-
-같은 DB 안이면 **JOIN이 1순위**다. SQL 레벨에서 끝나 네트워크 왕복이 없고 가장 단순하다. IN절 배치는 JOIN이 불가능하거나 컬렉션을 로딩할 때의 대안이다.
-
 #### 선택: JPQL JOIN (생성자 표현식 projection)
 
-현 과제는 `Enrollment`와 `Course`가 같은 DB에 있고 조인이 단순하므로 JPQL 생성자 표현식이 가장 적절하다고 판단했다.
+- 같은 DB 안이면 **JOIN이 1순위**다. SQL 레벨에서 끝나 추가 네트워크 왕복이 없고 가장 단순하다.
+- 이 과제는 `Enrollment`와 `Course`가 같은 DB에 있고 조인이 단순하므로 JPQL 생성자 표현식이 가장 적절하다고 판단했다. (조인이 불가능하거나 컬렉션을 로딩할 때는 IN절 배치가 대안이다.)
 
 **구현: before / after**
 
@@ -206,17 +237,22 @@ List<MyEnrollmentResponse> findMyEnrollments(@Param("classmateId") Long classmat
 return enrollmentRepository.findMyEnrollments(classmateId);
 ```
 
-**결과: before / after** (신청 12건 조회, `MyEnrollmentNPlusOneTest`로 측정)
+**결과: before / after** (신청 12건 조회 기준)
 
-| 구분     | 조회 쿼리 수       | 비고                       |
-|--------|---------------|--------------------------|
-| before | `13` (1 + 12) | 신청 수 N에 정비례해 증가(`1 + N`) |
-| after  | `1`           | 신청 수와 무관하게 단일 조인 쿼리      |
+| 구분     | 조회 쿼리 수       | 비고                                                   |
+|--------|---------------|------------------------------------------------------|
+| before | `13` (1 + 12) | 신청 수 N에 정비례해 증가(`1 + N`) — 이론값                       |
+| after  | `1`           | 신청 수와 무관하게 단일 조인 쿼리 — `MyEnrollmentNPlusOneTest`로 검증 |
 
-## 6. 데이터 모델
+### 5-4. 도메인 간 의존
+
+- `CourseService`는 상세 조회의 `enrolledCount` 집계를 위해 `EnrollmentRepository`를, `EnrollmentService`는 정원 검사와 락을 위해 `CourseRepository`를 직접 호출한다.
+- 두 도메인이 같은 트랜잭션 경계와 같은 DB 안에 있고 cross-domain 호출이 단순 read이므로, 별도 조회 서비스를 두기보다 read 목적의 cross-repository 호출을 허용해 단순함을 택했다. 멀티 인스턴스나 복잡도 증가 시 조회 전용 서비스로 분리할 수 있다.
+
+## 6. 데이터 모델 설명
 
 - User는 별도 엔티티 없이 헤더 ID 값으로만 식별하며, Course에서는 `creator_id`, Enrollment에서는 `classmate_id`로 표현한다.
-- 활성 중복 신청 방지와 정원 초과 방지는 모두 Course 행 비관적 락 구간 내 검사로 보장한다(인덱스·유니크 제약에 의존하지 않음).
+- `course_id`는 논리적 참조다. JPA 연관관계 없이 ID 값만 보관하며(5-3), DB 레벨 FK 제약은 두지 않았다.
 
 ```mermaid
 erDiagram
@@ -236,7 +272,7 @@ erDiagram
 
     ENROLLMENT {
         bigint id PK
-        bigint course_id FK
+        bigint course_id FK "논리적 참조 — DB 제약 없음"
         bigint classmate_id
         varchar status "PENDING|CONFIRMED|CANCELLED"
         timestamp created_at "신청시각"
@@ -246,24 +282,24 @@ erDiagram
     COURSE ||--o{ ENROLLMENT: "수강 신청"
 ```
 
-## 7. API 명세
+## 7. API 목록 및 예시
 
-| # | Method | Path                                  | 설명                                | 주체          | 헤더        | 성공  | 주요 실패                      |
-|---|--------|---------------------------------------|-----------------------------------|-------------|-----------|-----|----------------------------|
-| 1 | POST   | `/courses`                            | 강의 등록(DRAFT)                      | 크리에이터       | X-User-Id | 201 | 400(검증)                    |
-| 2 | PATCH  | `/courses/{courseId}/status`          | 상태 전이                             | 크리에이터(소유자)  | X-User-Id | 200 | 400(불법전이)·403·404          |
-| 3 | GET    | `/courses?status={status}`            | 목록(상태 필터: OPEN·CLOSED)            | 누구나         | —         | 200 | 400(DRAFT·잘못된 status)      |
-| 4 | GET    | `/courses/{courseId}`                 | 상세(현재 신청 인원 포함)                   | 누구나         | —         | 200 | 404                        |
-| 5 | POST   | `/courses/{courseId}/enrollments`     | 수강 신청 ★동시성                        | 클래스메이트      | X-User-Id | 201 | 409(만석/중복)·400(미OPEN)·404  |
-| 6 | PATCH  | `/enrollments/{enrollmentId}/confirm` | 결제 확정 PENDING→CONFIRMED           | 클래스메이트(소유자) | X-User-Id | 200 | 400(PENDING 아닌 경우)·403·404 |
-| 7 | PATCH  | `/enrollments/{enrollmentId}/cancel`  | 취소(PENDING/CONFIRMED → CANCELLED) | 클래스메이트(소유자) | X-User-Id | 200 | 400(이미 취소)·403·404         |
-| 8 | GET    | `/enrollments/me`                     | 내 신청 목록(CANCELLED 포함 최신순)         | 클래스메이트      | X-User-Id | 200 | —                          |
+| #                                            | Method | Path                                  | 설명                                      | 주체          | 헤더        | 성공  | 주요 실패                            |
+|----------------------------------------------|--------|---------------------------------------|-----------------------------------------|-------------|-----------|-----|----------------------------------|
+| [1](#1-post-courses)                         | POST   | `/courses`                            | 강의 등록(`DRAFT`)                          | 크리에이터       | X-User-Id | 201 | 400(검증)                          |
+| [2](#2-get-courses)                          | GET    | `/courses?status={status}`            | 목록(상태 필터: `OPEN`/`CLOSED`)              | 누구나         | —         | 200 | 400(`DRAFT`/잘못된 status)          |
+| [3](#3-get-coursescourseid)                  | GET    | `/courses/{courseId}`                 | 상세(현재 신청 인원 포함)                         | 누구나         | —         | 200 | 404                              |
+| [4](#4-patch-coursescourseidstatus)          | PATCH  | `/courses/{courseId}/status`          | 상태 전이                                   | 크리에이터(소유자)  | X-User-Id | 200 | 400(검증/불법 전이)/403/404            |
+| [5](#5-post-coursescourseidenrollments)      | POST   | `/courses/{courseId}/enrollments`     | 수강 신청 ★동시성                              | 클래스메이트      | X-User-Id | 201 | 409(중복/정원 초과)/400(`OPEN` 아님)/404 |
+| [6](#6-patch-enrollmentsenrollmentidconfirm) | PATCH  | `/enrollments/{enrollmentId}/confirm` | 결제 확정(`PENDING` → `CONFIRMED`)          | 클래스메이트(소유자) | X-User-Id | 200 | 400(`PENDING` 아님)/403/404        |
+| [7](#7-patch-enrollmentsenrollmentidcancel)  | PATCH  | `/enrollments/{enrollmentId}/cancel`  | 취소(`PENDING`/`CONFIRMED` → `CANCELLED`) | 클래스메이트(소유자) | X-User-Id | 200 | 400(이미 취소)/403/404               |
+| [8](#8-get-enrollmentsme)                    | GET    | `/enrollments/me`                     | 내 신청 목록(`CANCELLED` 포함 최신순)             | 클래스메이트      | X-User-Id | 200 | —                                |
 
 ---
 
 ### 강의 관리
 
-#### POST /courses
+#### 1. POST /courses
 
 강의 등록. 요청자가 크리에이터가 된다. 초기 상태는 `DRAFT`.
 
@@ -294,8 +330,10 @@ X-User-Id: 1
 | `capacity`              | 필수, `1` 이상                           |
 | `startDate` / `endDate` | 필수, `startDate ≤ endDate` (과거 날짜 허용) |
 
-> 단일 필드 검증 실패 응답은 공통 에러 바디의 `errors[]`에 필드별 상세를 담아 반환한다. 단, 필드 간 교차검증(`startDate ≤ endDate`) 위반은 `INVALID_REQUEST` 코드와 빈
-`errors[]`로 반환한다.
+> 단일 필드 검증 실패 응답은 공통 에러 바디의 `errors[]`에 필드별 상세를 담아 반환한다.
+> 단, 필드 간 교차검증(`startDate ≤ endDate`) 위반은 `INVALID_REQUEST` 코드와 빈 `errors[]`로 반환한다.
+>
+> 단일 필드 검증 실패 예시:
 >
 > ```json
 > {
@@ -326,15 +364,14 @@ X-User-Id: 1
 
 ---
 
-#### GET /courses
+#### 2. GET /courses
 
 강의 목록 조회.
 
-- `status` 쿼리 파라미터로 필터링 가능하며, 생략 시 `DRAFT`를 제외한 전체(`OPEN`·`CLOSED`)를 반환한다. 허용값은 `OPEN`·`CLOSED`이며, `DRAFT` 및 그 외 값은
-  `400`.
+- `status` 쿼리 파라미터로 필터링 가능하며, 생략 시 `DRAFT`를 제외한 전체(`OPEN`, `CLOSED`)를 반환한다.
+- 허용값은 `OPEN`과 `CLOSED`. `DRAFT` 및 그 외 값은 `400`으로 거부한다(초안은 상세 조회로만 접근).
 - 기본 정렬은 `createdAt` 내림차순(최신순).
-- `DRAFT`(초안)는 공개 목록에 노출하지 않으며, `status=DRAFT` 요청도 `400`으로 거부한다. (초안은 상세 조회로만 접근)
-- 응답은 요약 DTO(`id`·`title`·`price`·`capacity`·`status`·`createdAt`)다.
+- 응답은 요약 DTO(`id`, `title`, `price`, `capacity`, `status`, `createdAt`)다.
 
 **Request**
 
@@ -359,7 +396,7 @@ GET /courses?status=OPEN
 
 ---
 
-#### GET /courses/{courseId}
+#### 3. GET /courses/{courseId}
 
 강의 상세 조회.
 
@@ -390,9 +427,9 @@ GET /courses?status=OPEN
 
 ---
 
-#### PATCH /courses/{courseId}/status
+#### 4. PATCH /courses/{courseId}/status
 
-강의 상태 변경. `DRAFT → OPEN → CLOSED` 단방향 전이만 허용.
+강의 상태 변경. `DRAFT` → `OPEN` → `CLOSED` 단방향 전이만 허용.
 
 **Request**
 
@@ -406,7 +443,7 @@ X-User-Id: 1
 }
 ```
 
-**Response** `200 OK` — 변경 결과는 최소 필드(`id`·`status`)만 반환한다.
+**Response** `200 OK` — 변경 결과는 최소 필드(`id`, `status`)만 반환한다.
 
 ```json
 {
@@ -415,17 +452,17 @@ X-User-Id: 1
 }
 ```
 
-| 상황                           | 응답                |
-|------------------------------|-------------------|
-| 소유자가 아닌 경우                   | `403 Forbidden`   |
-| 허용되지 않는 전이 (예: OPEN → DRAFT) | `400 Bad Request` |
-| 존재하지 않는 강의                   | `404 Not Found`   |
+| 상황                               | 응답                |
+|----------------------------------|-------------------|
+| 소유자가 아닌 경우                       | `403 Forbidden`   |
+| 허용되지 않는 전이 (예: `OPEN` → `DRAFT`) | `400 Bad Request` |
+| 존재하지 않는 강의                       | `404 Not Found`   |
 
 ---
 
 ### 수강 신청 관리
 
-#### POST /courses/{courseId}/enrollments
+#### 5. POST /courses/{courseId}/enrollments
 
 수강 신청. 요청자가 클래스메이트가 된다. 초기 상태는 `PENDING`.
 
@@ -448,20 +485,20 @@ X-User-Id: 100
 }
 ```
 
-> Enrollment 응답 DTO는 `createdAt`·`updatedAt`을 항상 포함하며, 생성 시 두 값은 동일하다.
+> 신청 생성, 확정, 취소 응답은 `createdAt`과 `updatedAt`을 포함한다. 내 신청 목록(8번)은 요약 DTO라 `updatedAt`을 제외했다.
 
-| 상황                              | 응답                |
-|---------------------------------|-------------------|
-| 정원 초과                           | `409 Conflict`    |
-| 이미 활성 신청 존재 (PENDING/CONFIRMED) | `409 Conflict`    |
-| OPEN 상태가 아닌 강의                  | `400 Bad Request` |
-| 존재하지 않는 강의                      | `404 Not Found`   |
+| 상황                                  | 응답                |
+|-------------------------------------|-------------------|
+| 정원 초과                               | `409 Conflict`    |
+| 이미 활성 신청 존재 (`PENDING`/`CONFIRMED`) | `409 Conflict`    |
+| `OPEN` 상태가 아닌 강의                    | `400 Bad Request` |
+| 존재하지 않는 강의                          | `404 Not Found`   |
 
 ---
 
-#### PATCH /enrollments/{enrollmentId}/confirm
+#### 6. PATCH /enrollments/{enrollmentId}/confirm
 
-결제 확정. `PENDING → CONFIRMED` 상태 변경. 검사 순서: 신청 존재(404) → 소유자(403) → 상태(400).
+결제 확정. `PENDING` → `CONFIRMED` 상태 변경. 검증 순서: 신청 존재(404) → 소유자(403) → 상태(400).
 
 **Request**
 
@@ -478,21 +515,21 @@ X-User-Id: 100
   "classmateId": 100,
   "status": "CONFIRMED",
   "createdAt": "2026-06-05T10:00:00",
-  "updatedAt": "2026-06-05T10:05:00"
+  "updatedAt": "2026-06-05T10:00:00"
 }
 ```
 
-| 상황                | 응답                |
-|-------------------|-------------------|
-| 소유자가 아닌 경우        | `403 Forbidden`   |
-| PENDING 상태가 아닌 경우 | `400 Bad Request` |
-| 존재하지 않는 신청        | `404 Not Found`   |
+| 상황                  | 응답                |
+|---------------------|-------------------|
+| 소유자가 아닌 경우          | `403 Forbidden`   |
+| `PENDING` 상태가 아닌 경우 | `400 Bad Request` |
+| 존재하지 않는 신청          | `404 Not Found`   |
 
 ---
 
-#### PATCH /enrollments/{enrollmentId}/cancel
+#### 7. PATCH /enrollments/{enrollmentId}/cancel
 
-수강 취소. `PENDING` 또는 `CONFIRMED → CANCELLED` 상태 변경. 취소 시 즉시 정원 해제. 검사 순서: 신청 존재(404) → 소유자(403) → 상태(400).
+수강 취소. `PENDING`/`CONFIRMED` → `CANCELLED` 상태 변경. 취소 시 즉시 정원 해제. 검증 순서: 신청 존재(404) → 소유자(403) → 상태(400).
 
 **Request**
 
@@ -509,7 +546,7 @@ X-User-Id: 100
   "classmateId": 100,
   "status": "CANCELLED",
   "createdAt": "2026-06-05T10:00:00",
-  "updatedAt": "2026-06-05T10:10:00"
+  "updatedAt": "2026-06-05T10:00:00"
 }
 ```
 
@@ -521,10 +558,10 @@ X-User-Id: 100
 
 ---
 
-#### GET /enrollments/me
+#### 8. GET /enrollments/me
 
-내 수강 신청 목록 조회. `CANCELLED` 포함, `createdAt` 내림차순(최신순) 정렬. 응답의 `courseTitle`은 Course 조인으로 채운다(fetch join 또는 DTO
-projection으로 N+1 회피).
+내 수강 신청 목록 조회. `CANCELLED` 포함, `createdAt` 내림차순(최신순) 정렬. 응답의 `courseTitle`은 Course 조인 DTO projection 한 번으로 채워 N+1을
+회피한다(5-3).
 
 **Request**
 
@@ -565,20 +602,34 @@ X-User-Id: 100
 ./gradlew test
 ```
 
+핵심인 동시성 테스트만 따로 실행하려면:
+
+```bash
+./gradlew test --tests '*EnrollmentConcurrencyTest'
+```
+
+> `show-sql=true`가 켜져 있어, 수강 신청 시 비관적 쓰기 락 쿼리(`select ... for update`)가 나가는 것을 콘솔 로그에서 직접 확인할 수 있다.
+
 **현재 테스트 구성**
 
-| 테스트                        | 위치                      | 유형                | 검증 내용                                                                                     |
-|----------------------------|-------------------------|-------------------|-------------------------------------------------------------------------------------------|
-| `CourseTest`               | `course/domain`         | 단위                | 상태 전이(`DRAFT`→`OPEN`→`CLOSED`)·불법 전이 예외, `changeStatusTo` 디스패치, 소유자 판별, 기간 불변식(시작일 ≤ 종료일) |
-| `EnrollmentTest`           | `enrollment/domain`     | 단위                | 신청 상태 전이(`PENDING`→`CONFIRMED`/`CANCELLED`)·불법 전이 예외, 소유자 판별, 활성 여부 판별                    |
-| `CourseRepositoryTest`     | `course/repository`     | `@DataJpaTest`    | 공개 목록 조회 시 `DRAFT` 제외                                                                     |
-| `EnrollmentRepositoryTest` | `enrollment/repository` | `@DataJpaTest`    | 활성 신청(`PENDING`+`CONFIRMED`) 집계·활성 중복 판별, 내 신청 목록 조인 조회(`courseTitle`·최신순)                |
-| `CourseStatusApiTest`      | `course/controller`     | `@SpringBootTest` | 상태 변경 API 통합 — 검증 순서(404→403→400)·정상 전이                                                   |
-| `EnrollmentApiTest`        | `enrollment/controller` | `@SpringBootTest` | 수강 신청 API 통합 — 검증 순서(404→400→409중복→409만석)·정상 신청                                           |
-| `EnrollmentStatusApiTest`  | `enrollment/controller` | `@SpringBootTest` | 결제 확정·취소 API 통합 — 검사 순서(404→403→400)·정상 전이                                                |
-| `MyEnrollmentNPlusOneTest` | `enrollment/controller` | `@SpringBootTest` | 내 신청 목록 N+1 회귀 — 신청 12건 조회가 단일 쿼리(§5-3)                                                   |
+| 테스트                         | 위치                      | 유형                | 검증 내용                                                                                              |
+|-----------------------------|-------------------------|-------------------|----------------------------------------------------------------------------------------------------|
+| `CourseTest`                | `course/domain`         | 단위                | 상태 전이(`DRAFT` → `OPEN` → `CLOSED`), 불법 전이 예외, 상태 변경 분기(`changeStatusTo`), 소유자 판별, 기간 불변식(시작일 ≤ 종료일) |
+| `EnrollmentTest`            | `enrollment/domain`     | 단위                | 신청 상태 전이(`PENDING` → `CONFIRMED`/`CANCELLED`), 불법 전이 예외, 소유자 판별                                      |
+| `CourseRepositoryTest`      | `course/repository`     | `@DataJpaTest`    | 공개 목록 `DRAFT` 제외, `createdAt` 내림차순 정렬, 상태 필터 파생 쿼리                                                 |
+| `EnrollmentRepositoryTest`  | `enrollment/repository` | `@DataJpaTest`    | 활성 신청(`PENDING`+`CONFIRMED`) 집계와 활성 중복 판별, 내 신청 목록 조인 조회(`courseTitle`, 최신순)                         |
+| `CourseCreateApiTest`       | `course/controller`     | `@SpringBootTest` | 강의 등록 API 통합 — 정상 201 응답 셰이프, 검증 실패 `VALIDATION_FAILED`+`errors[]`, 교차검증 `INVALID_REQUEST`        |
+| `CourseListApiTest`         | `course/controller`     | `@SpringBootTest` | 목록 조회 API 통합 — 상태 필터, `DRAFT`/잘못된 값 400, 요약 필드 셰이프                                                 |
+| `CourseDetailApiTest`       | `course/controller`     | `@SpringBootTest` | 상세 조회 API 통합 — `enrolledCount`(CANCELLED 제외), `remaining`, 404                                       |
+| `CourseStatusApiTest`       | `course/controller`     | `@SpringBootTest` | 상태 변경 API 통합 — 검증 순서(404→403→400), 정상 전이, 잘못된 상태 값 400                                              |
+| `EnrollmentApiTest`         | `enrollment/controller` | `@SpringBootTest` | 수강 신청 API 통합 — 검증 순서(404→400→409 중복→409 정원 초과), 정상 신청, `X-User-Id` 누락이나 형식 오류 400                     |
+| `EnrollmentStatusApiTest`   | `enrollment/controller` | `@SpringBootTest` | 결제 확정과 취소 API 통합 — 검증 순서(404→403→400), 정상 전이                                                         |
+| `MyEnrollmentNPlusOneTest`  | `enrollment/controller` | `@SpringBootTest` | 내 신청 목록 N+1 회귀 — 신청 12건 조회가 단일 쿼리(5-3)                                                             |
+| `EnrollmentConcurrencyTest` | `enrollment/service`    | `@SpringBootTest` | 동시성 제어 — 정원 1에 10명 / 정원 5에 50명 동시 신청 시 정확히 정원만큼만 성공, DB 활성 신청 수 일치 검증(5-1)                          |
 
 ## 9. 미구현 / 제약사항
+
+### 미구현
 
 - 선택 구현 4종(취소 가능 기간 제한, 대기열, 강의별 수강생 목록 조회, 신청 내역 페이지네이션)은 필수 범위 완성을 우선하여 구현하지 않았다.
 - 인증/인가는 User 엔티티 없이 `X-User-Id` 헤더 식별로 간소화했다 (과제 가이드 허용 방식).
@@ -591,13 +642,15 @@ X-User-Id: 100
     - 도메인 규칙, 에러 규약, API 명세를 AI와 함께 설계하며 트레이드오프를 검토하고, 최종 결정은 직접 내렸습니다.
 2. TDD 구현
     - 상태 전이, 정원 관리, 동시성 제어 같은 주요 로직은 빨강 → 초록 사이클(TDD)로 코드를 직접 작성했고, AI는 가이드로 활용했습니다.
-    - 나머지 기타 테스트들은 스펙을 기반으로 AI로 구현 후 검증을 하였습니다.
+    - 핵심 외 테스트 보강은 AI 작성 비중이 컸고, 각 케이스가 필요한 이유를 스펙과 대조하며 직접 검증했습니다.
+    - 구현 중 막힌 개념(예: dirty checking 변경 감지)은 원리를 AI에 물어 직접 이해하고 넘어갔습니다.
 3. 커밋 전 점검
-    - 커밋 전 4단계를 순서대로 거쳤습니다. "올바른 걸 만들었나 → 올바르게 만들었나 → 깔끔하게 만들었나". 1·2는 편향을 줄이려 독립 에이전트로 점검(보고)하고, 수정은 AI가 적용한 뒤 직접
-      검토했습니다.
+    - 커밋 전 4단계 워크플로우를 순서대로 거쳤습니다.
         1. 스펙 대조: 구현이 README 스펙과 일치하는지 대조하여 방향 오류를 가장 먼저 차단.
         2. 코드 리뷰(`/code-review`): 버그, 엣지케이스, 정확성 점검.
         3. 단순화(`/simplify`): 중복, 복잡도 정리.
         4. 전체 테스트: 위 수정 및 정리를 반영한 뒤 `./gradlew test`가 전부 green인지 확인하고, 실패 시 커밋을 보류.
 4. 커밋 메시지
     - 변경 내용을 바탕으로 AI가 초안을 제시하면, 직접 검토 후 수정해 커밋했습니다.
+5. 문서 정리
+    - 결정된 설계와 구현 내용을 바탕으로 README는 AI 초안 비중을 크게 두되, 스펙과 코드에 대조해 직접 다듬었습니다.
