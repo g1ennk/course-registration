@@ -6,8 +6,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 
-import java.util.List;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
@@ -38,10 +36,30 @@ public class EnrollmentRepositoryTest {
 
         // 활성 상태 개수 = 2건
         long count = enrollmentRepository.countByCourseIdAndStatusIn(
-                1L, List.of(EnrollmentStatus.PENDING, EnrollmentStatus.CONFIRMED)
+                1L, EnrollmentStatus.ACTIVE
         );
 
         assertThat(count).isEqualTo(2);
+    }
+
+    @Test
+    void 활성_중복_신청을_판별한다() {
+        // courseId = 1, classmateId = 100, PENDING (활성 상태)
+        enrollmentRepository.save(new Enrollment(1L, 100L));
+
+        // courseId = 1, classmateId = 101, CANCELLED (비활성 상태)
+        Enrollment cancelled = new Enrollment(1L, 101L);
+        cancelled.cancel();
+        enrollmentRepository.save(cancelled);
+
+        // id가 100인 수강생은 활성 신청이 있음(PENDING)
+        assertThat(enrollmentRepository.existsByCourseIdAndClassmateIdAndStatusIn(1L, 100L, EnrollmentStatus.ACTIVE)).isTrue();
+
+        // id가 101인 수강생은 활성 신청이 없음(CANCELLED)
+        assertThat(enrollmentRepository.existsByCourseIdAndClassmateIdAndStatusIn(1L, 101L, EnrollmentStatus.ACTIVE)).isFalse();
+
+        // 신청 이력이 없는 사용자는 활성 신청 불가능
+        assertThat(enrollmentRepository.existsByCourseIdAndClassmateIdAndStatusIn(1L, 999L, EnrollmentStatus.ACTIVE)).isFalse();
     }
 
 }

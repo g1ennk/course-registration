@@ -500,8 +500,9 @@ X-User-Id: 100
 | `CourseTest` | `course/domain` | 단위 | 상태 전이(`DRAFT`→`OPEN`→`CLOSED`)·불법 전이 예외, `changeStatusTo` 디스패치, 소유자 판별, 기간 불변식(시작일 ≤ 종료일) |
 | `EnrollmentTest` | `enrollment/domain` | 단위 | 신청 상태 전이(`PENDING`→`CONFIRMED`/`CANCELLED`)·불법 전이 예외, 소유자 판별, 활성 여부 판별 |
 | `CourseRepositoryTest` | `course/repository` | `@DataJpaTest` | 공개 목록 조회 시 `DRAFT` 제외 |
-| `EnrollmentRepositoryTest` | `enrollment/repository` | `@DataJpaTest` | 활성 신청(`PENDING`+`CONFIRMED`) 집계 — 취소·타 강의 제외 |
+| `EnrollmentRepositoryTest` | `enrollment/repository` | `@DataJpaTest` | 활성 신청(`PENDING`+`CONFIRMED`) 집계 — 취소·타 강의 제외, 활성 중복 신청 판별 |
 | `CourseStatusApiTest` | `course/controller` | `@SpringBootTest` | 상태 변경 API 통합 — 검증 순서(404→403→400)·정상 전이 |
+| `EnrollmentApiTest` | `enrollment/controller` | `@SpringBootTest` | 수강 신청 API 통합 — 검증 순서(404→400→409중복→409만석)·정상 신청 |
 
 ## 9. 미구현 / 제약사항
 

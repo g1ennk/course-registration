@@ -8,4 +8,6 @@ import java.util.List;
 
 public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
     long countByCourseIdAndStatusIn(Long courseId, List<EnrollmentStatus> statuses);
+
+    boolean existsByCourseIdAndClassmateIdAndStatusIn(Long courseId, Long classmateId, List<EnrollmentStatus> statuses);
 }

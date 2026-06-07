@@ -54,7 +54,7 @@ public class CourseService {
                 .orElseThrow(() -> new ApiException(ErrorCode.COURSE_NOT_FOUND));
 
         int enrolledCount = (int) enrollmentRepository.countByCourseIdAndStatusIn(
-                courseId, List.of(EnrollmentStatus.PENDING, EnrollmentStatus.CONFIRMED));
+                courseId, EnrollmentStatus.ACTIVE);
         int remaining = course.getCapacity() - enrolledCount;
 
         return CourseDetailResponse.from(course, enrolledCount, remaining);
