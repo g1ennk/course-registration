@@ -26,7 +26,7 @@ public class EnrollmentService {
     @Transactional
     public EnrollmentResponse apply(Long courseId, Long classmateId) {
         // 1. 강의가 존재하는지 확인 (404)
-        Course course = courseRepository.findById(courseId)
+        Course course = courseRepository.findWithLockById(courseId)
                 .orElseThrow(() -> new ApiException(ErrorCode.COURSE_NOT_FOUND));
 
         // 2. 강의가 열렸는지 확인 (400)
