@@ -76,4 +76,15 @@ class CourseStatusApiTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_STATE_TRANSITION"));
     }
+
+    @Test
+    void 잘못된_status_값_본문은_400() throws Exception {
+        Long id = savedCourseId(1L);
+        mockMvc.perform(patch("/courses/" + id + "/status")
+                        .header("X-User-Id", 1)
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"status\":\"FOO\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
 }

@@ -89,4 +89,22 @@ class EnrollmentApiTest {
                 .andExpect(jsonPath("$.createdAt").exists())
                 .andExpect(jsonPath("$.updatedAt").exists());
     }
+
+    @Test
+    void X_User_Id_헤더가_없으면_400() throws Exception {
+        Long id = openCourse(10);
+
+        mockMvc.perform(post("/courses/" + id + "/enrollments"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
+    void X_User_Id_헤더가_Long이_아니면_400() throws Exception {
+        Long id = openCourse(10);
+
+        mockMvc.perform(post("/courses/" + id + "/enrollments").header("X-User-Id", "abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
 }

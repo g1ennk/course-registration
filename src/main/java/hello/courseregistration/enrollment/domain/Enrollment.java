@@ -63,8 +63,4 @@ public class Enrollment {
     public boolean isOwnedBy(Long classmateId) {
         return Objects.equals(this.classmateId, classmateId);
     }
-
-    public boolean isActive() {
-        return status == EnrollmentStatus.PENDING || status == EnrollmentStatus.CONFIRMED;
-    }
 }

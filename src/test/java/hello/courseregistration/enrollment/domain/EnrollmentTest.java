@@ -80,21 +80,4 @@ class EnrollmentTest {
         assertThat(e.isOwnedBy(100L)).isTrue();
         assertThat(e.isOwnedBy(999L)).isFalse();
     }
-
-    @Test
-    void 활성_판별() {
-        // PENDING = ACTIVE
-        Enrollment pending = pendingEnrollment();
-        assertThat(pending.isActive()).isTrue();
-
-        // CONFIRMED = ACTIVE
-        Enrollment confirmed = pendingEnrollment();
-        confirmed.confirm();
-        assertThat(confirmed.isActive()).isTrue();
-
-        // CANCELLED = INACTIVE
-        Enrollment cancelled = pendingEnrollment();
-        cancelled.cancel();
-        assertThat(cancelled.isActive()).isFalse();
-    }
 }
