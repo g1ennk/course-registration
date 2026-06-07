@@ -20,4 +20,17 @@ public class EnrollmentController {
         return enrollmentService.apply(courseId, classmateId);
     }
 
+    @PatchMapping("/enrollments/{enrollmentId}/confirm")
+    public EnrollmentResponse confirm(
+            @PathVariable Long enrollmentId,
+            @RequestHeader("X-User-Id") Long classmateId) {
+        return enrollmentService.confirm(enrollmentId, classmateId);
+    }
+
+    @PatchMapping("/enrollments/{enrollmentId}/cancel")
+    public EnrollmentResponse cancel(
+            @PathVariable Long enrollmentId,
+            @RequestHeader("X-User-Id") Long classmateId) {
+        return enrollmentService.cancel(enrollmentId, classmateId);
+    }
 }

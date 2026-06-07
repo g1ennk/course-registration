@@ -15,7 +15,8 @@ public enum ErrorCode {
     COURSE_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 강의입니다"),
     COURSE_NOT_OPEN(HttpStatus.BAD_REQUEST, "OPEN 상태의 강의만 신청할 수 있습니다"),
     DUPLICATE_ENROLLMENT(HttpStatus.CONFLICT, "이미 신청한 강의입니다"),
-    COURSE_FULL(HttpStatus.CONFLICT, "정원이 초과되었습니다");
+    COURSE_FULL(HttpStatus.CONFLICT, "정원이 초과되었습니다"),
+    ENROLLMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 신청입니다");
 
     private final HttpStatus status;
     private final String message;

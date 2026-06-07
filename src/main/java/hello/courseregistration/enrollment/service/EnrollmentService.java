@@ -47,4 +47,31 @@ public class EnrollmentService {
         return EnrollmentResponse.from(saved);
     }
 
+    @Transactional
+    public EnrollmentResponse confirm(Long enrollmentId, Long classmateId) {
+        Enrollment enrollment = ownedEnrollment(enrollmentId, classmateId);
+        enrollment.confirm();
+        return EnrollmentResponse.from(enrollment);
+    }
+
+    @Transactional
+    public EnrollmentResponse cancel(Long enrollmentId, Long classmateId) {
+        Enrollment enrollment = ownedEnrollment(enrollmentId, classmateId);
+        enrollment.cancel();
+        return EnrollmentResponse.from(enrollment);
+    }
+
+    // 신청 검사 순서 헬퍼 메서드: 신청이 존재하는지(404) -> 소유자인지(403)
+    private Enrollment ownedEnrollment(Long enrollmentId, Long classmateId) {
+        // 404
+        Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
+                .orElseThrow(() -> new ApiException(ErrorCode.ENROLLMENT_NOT_FOUND));
+        // 403
+        if (!enrollment.isOwnedBy(classmateId)) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "본인의 신청만 변경할 수 있습니다");
+        }
+        return enrollment;
+    }
+
+
 }

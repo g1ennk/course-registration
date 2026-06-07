@@ -1,3 +1,11 @@
 ### 수강 신청 (201 Created, 초기 상태 PENDING)
 POST http://localhost:8080/courses/1/enrollments
 X-User-Id: 100
+
+### 결제 확정 (200 OK, PENDING → CONFIRMED, 소유자만)
+PATCH http://localhost:8080/enrollments/1/confirm
+X-User-Id: 100
+
+### 수강 취소 (200 OK, PENDING/CONFIRMED → CANCELLED, 소유자만)
+PATCH http://localhost:8080/enrollments/1/cancel
+X-User-Id: 100
